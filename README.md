@@ -1,5 +1,7 @@
 # spectracrawl
 
+![spectraplot picture](_assets/spectraplot.png)
+
 Run this program and
 it shall scrape gas absorption data from 
 [spectraplot.com's](http://www.spectraplot.com/absorption) 
