@@ -1,3 +1,11 @@
+# Testing
+testdata/SpectraPlotSimulations.zip
+testdata/nu=**
+
+# Program output and log
+*.log
+output/*
+
 # Binaries for programs and plugins
 *.exe
 *.exe~

@@ -1,0 +1,1448 @@
+<html><head>
+    <meta charset="utf-8">
+
+
+
+
+    <meta name="Description" content="Atomic and molecular spectral absorption simulator that uses the HITRAN, HITEMP, and NIST databases!  Easily simulate your favorite molecules while finding the hardware you need to do your experiments.">
+    <title>SpectraPlot.com - Absorption spectroscopy simulator</title>
+
+
+
+
+
+
+
+
+
+    <link href="/static/bootstrap.css" rel="stylesheet"><link href="/static/plotting.css" rel="stylesheet"><link href="/static/spectraplot.css" rel="stylesheet"><link href="/static/theme.default.css" rel="stylesheet"><script async="" src="//www.google-analytics.com/analytics.js"></script><script src="/static/jquery-1.11.1.min.js"></script><script src="/static/jquery.cookie.js"></script><script src="/static/d3.v3.js"></script><script type="text/javascript" src="/static/bootstrap.js"></script><script type="text/javascript" src="/static/buildTables.js"></script><script type="text/javascript" src="/static/jquery.tablesorter.min.js"></script><script type="text/javascript" src="/static/jquery.tablesorter.widgets.min.js"></script><script type="text/javascript" src="/static/saveSvgAsPng.js?nist"></script><script type="text/javascript" src="/static/displayIntroGroup.js?nist"></script><script type="text/javascript">
+        var $SCRIPT_ROOT = "";
+    </script><script type="text/javascript" src="/static/plotting.js?nist2"></script><script>
+        (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+            (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+            m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+        })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+        ga('create', 'UA-54931830-1', 'auto');
+        ga('send', 'pageview');
+    </script></head>
+
+
+
+<!-- load style sheets-->
+<!-- bootstrap -->
+<!-- d3 plot styles -->
+<!-- splot specific styles -->
+<!-- for table sorter -->
+
+<!-- load some javascript-->
+
+
+
+
+
+
+
+<!-- saving png -->
+<!-- for d3 intro plot -->
+<!--<script type=text/javascript src="http://l2.io/ip.js?var=myip"></script>-->
+<!-- gets the user's ip -->
+
+
+
+
+
+
+
+
+
+<body id="page-top" class="index" data-gr-c-s-loaded="true" style="">
+<nav class="navbar navbar-default navbar-fixed-top">
+    <div class="container">
+        <!-- Brand and toggle get grouped for better mobile display -->
+        <div class="navbar-header page-scroll">
+            <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+            </button>
+            <a class="navbar-brand" style="padding: 15px 35px;" href="/"><b>Spectra</b>Plot</a>
+        </div>
+        <!-- Collect the nav links, forms, and other content for toggling -->
+        <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+            <ul class="nav navbar-nav navbar-left">
+                <li class="active"><a href="/absorption">Absorption
+                        <span class="sr-only">  (current)  </span></a></li>
+
+                <li><a href="/emission">Emission
+                        <span class="sr-only"></span></a></li>
+
+                <li><a href="/survey">LineSurvey
+                        <span class="sr-only"></span></a></li>
+
+                <li><a href="/blackbody">BlackBody
+                        <span class="sr-only"></span></a></li>
+
+                <li><a href="/hardware">Hardware
+                        <span class="sr-only"></span></a></li>
+            </ul>
+        </div>
+    </div>
+</nav>
+
+<!-- alerts!! -->
+<div class="alert alert-danger alert-dismissible" role="alert" hidden="true" id="alertDiv" style="display: none;">
+    <button type="button" class="close" onclick="$('.calculate').button('reset');$('#calculate_nist').button('reset');$('#calculate_hitran').button('reset');$('#alertDiv').hide();"><span aria-hidden="true">×</span><span class="sr-only">Close</span></button>
+    <strong>Sorry!</strong> Something went wrong with the calculation!
+</div>
+
+<div class="alert alert-warning alert-dismissible" role="alert" hidden="true" id="timeoutDiv" style="display: none;">
+    <button type="button" class="close" onclick="$('#calculate').button('reset');$('#calculate_nist').button('reset');$('#calculate_hitran').button('reset');$('#timeoutDiv').hide();"><span aria-hidden="true">×</span><span class="sr-only">Close</span></button>
+    <strong>Sorry!</strong> Your simulation took too long.  Reduce your simulation range or increase Δν.
+</div>
+
+<div class="alert alert-warning alert-dismissible" role="alert" hidden="true" id="reduceDiv" style="display: none;">
+    <button type="button" class="close" onclick="$('#calculate').button('reset');$('#calculate_nist').button('reset');$('#calculate_hitran').button('reset');$('#reduceDiv').hide();"><span aria-hidden="true">×</span><span class="sr-only">Close</span></button>
+    <strong>Sorry!</strong> We reduced your resolution ν<sub>step</sub> to reduce compute time.
+</div>
+
+<div class="alert alert-danger alert-dismissible" role="alert" hidden="true" id="molefracDiv" style="display: none;">
+    <button type="button" class="close" onclick="$('#calculate').button('reset');$('#calculate_nist').button('reset');$('#calculate_hitran').button('reset');$('#molefracDiv').hide();"><span aria-hidden="true">×</span><span class="sr-only">Close</span></button>
+    <strong>Every mole fraction must be less than 1!</strong> See "How it works" for an explanation of how mixtures are handled.
+</div>
+
+<div class="alert alert-danger alert-dismissible" role="alert" hidden="true" id="molefracSurveyDiv" style="display: none;">
+    <button type="button" class="close" onclick="$('#calculate').button('reset');$('#calculate_nist').button('reset');$('#calculate_hitran').button('reset');$('#molefracSurveyDiv').hide();"><span aria-hidden="true">×</span><span class="sr-only">Close</span></button>
+    <strong>Mole fractions should be less than 1!</strong> In the LineSurvey, mole fractions are used to scale linestrength.
+</div>
+
+<div class="alert alert-warning alert-dismissible" role="alert" hidden="true" id="simrangeDiv" style="display: none;">
+    <button type="button" class="close" onclick="$('#simrangeDiv').hide();"><span aria-hidden="true">×</span><span class="sr-only">Close</span></button>
+    <strong>You're simulating a big range.</strong> For surveys, we recommend using the <a href="/survey">LineSurvey</a> tool.
+</div>
+
+<div class="alert alert-warning alert-dismissible" role="alert" hidden="true" id="notinfraredDiv" style="display: none;">
+    <button type="button" class="close" onclick="$('#calculate').button('reset');$('#calculate_nist').button('reset');$('#calculate_hitran').button('reset');$('#notinfraredDiv').hide();"><span aria-hidden="true">×</span><span class="sr-only">Close</span></button>
+    <strong>Your wavelength is quite short!</strong> Check the HITRAN documentation to see if visible/UV lines are included for this species.
+</div>
+
+
+<div class="alert alert-warning alert-dismissible" role="alert" hidden="true" id="reduceLinesDiv" style="display: none;">
+    <button type="button" class="close" onclick="$('#calculate').button('reset');$('#reduceLinesDiv').hide();"><span aria-hidden="true">×</span><span class="sr-only">Close</span></button>
+    <strong>Not all of your lines were plotted, sorry!</strong> Either reduce your simulation window or increase the Linestrength cutoff.
+</div>
+
+<div class="alert alert-danger alert-dismissible" role="alert" hidden="true" id="toobigDiv" style="display: none;">
+    <button type="button" class="close" onclick="$('#calculate').button('reset');$('#calculate_nist').button('reset');$('#calculate_hitran').button('reset');$('#toobigDiv').hide();"><span aria-hidden="true">×</span><span class="sr-only">Close</span></button>
+    <strong>Your simulation range is too big, Sorry!</strong> We can only simulate 3000 cm<sup>-1</sup> at a time.
+</div>
+
+<div class="alert alert-danger alert-dismissible" role="alert" hidden="true" id="toobigAbsEmisDiv" style="display: none;">
+    <button type="button" class="close" onclick="$('#calculate').button('reset');$('#calculate_nist').button('reset');$('#calculate_hitran').button('reset');$('#toobigAbsEmisDiv').hide();"><span aria-hidden="true">×</span><span class="sr-only">Close</span></button>
+    <strong>Your simulation range is too big, Sorry!</strong> We can only simulate 100 cm<sup>-1</sup> at a time.
+</div>
+
+<div class="alert alert-danger alert-dismissible" role="alert" hidden="true" id="surveyZeroCutoff" style="display: none;">
+    <button type="button" class="close" onclick="$('#calculate').button('reset');$('#calculate_nist').button('reset');$('#calculate_hitran').button('reset');$('#surveyZeroCutoff').hide();"><span aria-hidden="true">×</span><span class="sr-only">Close</span></button>
+    <strong>Sorry!</strong>  Your minimum linestrength must be greater than 1e-10!
+</div>
+
+<div class="alert alert-warning alert-dismissible" role="alert" hidden="true" id="n2hitran" style="display: none;">
+    <button type="button" class="close" onclick="$('#calculate').button('reset');$('#calculate_nist').button('reset');$('#calculate_hitran').button('reset');$('#n2hitran').hide();"><span aria-hidden="true">×</span><span class="sr-only">Close</span></button>
+    <strong>It looks like you're simulating N<sub>2</sub> with a relatively short pathlength.</strong>  N<sub>2</sub> is only weakly infrared active.  Make sure you double check how mixtures are calculated, described in the <a data-toggle="modal" data-target="#myModal">How It Works</a>.
+</div>
+
+<div class="alert alert-warning alert-dismissible" role="alert" hidden="true" id="einsteinA" style="display: none;">
+    <button type="button" class="close" onclick="$('#calculate').button('reset');$('#calculate_nist').button('reset');$('#calculate_hitran').button('reset');$('#einsteinA').hide();"><span aria-hidden="true">×</span><span class="sr-only">Close</span></button>
+    <strong>Some lines for <span id="alertSpec"></span> in your simulation have estimated line strengths.</strong>  The NIST database does not have all of the Einstein A coefficients for these species in this spectral window, so we estimate line strengths using A=10<sup>7</sup> s<sup>-1</sup>.  Please use the <a href="/survey">LineSurvey</a> tool to explore in more detail.
+</div>
+<div class="alert alert-danger alert-dismissible" role="alert" hidden="true" id="badspecies" style="display: none;">
+    <button type="button" class="close" onclick="$('#calculate').button('reset');$('#calculate_nist').button('reset');$('#calculate_hitran').button('reset');$('#badspecies').hide();"><span aria-hidden="true">×</span><span class="sr-only">Close</span></button>
+    <strong>HITEMP CO<sub>2</sub> and H<sub>2</sub>O have a lot of lines!</strong> Please reduce your simulation window to less than 1000 cm<sup>-1</sup>.  Web browsers have a hard time plotting that much data, and the database queries can take a while.
+</div>
+
+<section>
+    <div class="container-fluid">
+        <div class="row col-xs-12">
+            <div role="tabpanel" style="margin-top:10px;">
+                <ul class="nav nav-tabs" role="tablist" id="myTab" style="margin-bottom:20px;font-size:12pt;">
+                    <li role="presentation" class=" active "> <a href="#hitran" aria-controls="hitran" role="tab" data-toggle="tab" onclick="$.cookie('DBpanel','hitran')" style="color:red;"><b>HITRAN/HITEMP</b></a>
+                    </li>
+                    <li role="presentation" class=""> <a href="#nist" aria-controls="nist" role="tab" data-toggle="tab" onclick="$.cookie('DBpanel','nist')" style="color:blue;"><b>NIST ASD</b></a>
+                    </li>
+                </ul>
+
+                <div class="tab-content">
+
+
+
+
+
+
+
+
+
+
+
+                    <div role="tabpanel" class="tab-pane  active " id="hitran">
+                        <div class="row col-xs-12">
+                            <div class="col-xs-11 text-center">
+                                <table align="center" class="FrontPanel" style="table-layout: fixed;">
+                                    <tbody><tr class="spectable">
+                                        <td style="width:170px;"></td>
+                                        <td style="width:160px;">T (K) = <input type="text" size="5" name="T_hitran" value="300" tabindex="1"></td>
+                                        <td style="width:190px">λ<sub>start</sub> (μm) = <input type="text" size="5" name="lstart_hitran" value="2195" tabindex="4"></td>
+                                        <td style="text-align:center; width:20px;">or</td>
+                                        <td style="width:190px">ν<sub>start</sub> (cm<sup>-1</sup>) = <input type="text" size="5" name="vstart_hitran" value="2195" tabindex="6"></td>
+                                        <td style="width:100px;text-align:center">
+                                            <div class="btn-group">
+                                                <ul id="multicol-menu" class="nav">
+                                                    <li class="dropdown open">
+                                                        <a class="dropdown-toggle" data-toggle="dropdown" id="spec1_hitran"><span class="specspan" id="specspan1_hitran">CO</span><b class="caret"></b></a>
+                                                        <ul class="dropdown-menu nav disabled">
+                                                            <li>
+                                                                <b><u>HITRAN 2012</u></b>
+                                                                <div class="row" style="width: 400px;">
+                                                                    <ul class="list-unstyled col-xs-4">
+                                                                        <li><a class="hitran_species">CH<sub>3</sub>Cl</a></li>
+                                                                        <li><a class="hitran_species">CH<sub>3</sub>CN</a></li>
+                                                                        <li><a class="hitran_species">CH<sub>3</sub>OH</a></li>
+                                                                        <li><a class="hitran_species">CH<sub>4</sub></a></li>
+                                                                        <li><a class="hitran_species">CO</a></li>
+                                                                        <li><a class="hitran_species">CO<sub>2</sub></a></li>
+                                                                        <li><a class="hitran_species">COF<sub>2</sub></a></li>
+                                                                        <li><a class="hitran_species">C<sub>2</sub>H<sub>2</sub></a></li>
+                                                                        <li><a class="hitran_species">C<sub>2</sub>H<sub>4</sub></a></li>
+                                                                        <li><a class="hitran_species">C<sub>2</sub>H<sub>6</sub></a></li>
+                                                                        <li><a class="hitran_species">ClO</a></li>
+                                                                    </ul>
+                                                                    <ul class="list-unstyled col-xs-4">
+                                                                        <li><a class="hitran_species">HCOOH</a></li>
+                                                                        <li><a class="hitran_species">HCN</a></li>
+                                                                        <li><a class="hitran_species">HBr</a></li>
+                                                                        <li><a class="hitran_species">HCl</a></li>
+                                                                        <li><a class="hitran_species">HF</a></li>
+                                                                        <li><a class="hitran_species">HI</a></li>
+                                                                        <li><a class="hitran_species">HNO<sub>3</sub></a></li>
+                                                                        <li><a class="hitran_species">HOBr</a></li>
+                                                                        <li><a class="hitran_species">HOCl</a></li>
+                                                                        <li><a class="hitran_species">H<sub>2</sub>O</a></li>
+                                                                        <li><a class="hitran_species">H<sub>2</sub>O<sub>2</sub></a></li>
+                                                                        <li><a class="hitran_species">H<sub>2</sub>CO</a></li>
+                                                                        <li><a class="hitran_species">H<sub>2</sub>S</a></li>
+                                                                    </ul>
+                                                                    <ul class="list-unstyled col-xs-4">
+                                                                        <li><a class="hitran_species">NH<sub>3</sub></a></li>
+                                                                        <li><a class="hitran_species">NO</a></li>
+                                                                        <li><a class="hitran_species">NO<sub>2</sub></a></li>
+                                                                        <li><a class="hitran_species">NO+</a></li>
+                                                                        <li><a class="hitran_species">N<sub>2</sub></a></li>
+                                                                        <li><a class="hitran_species">N<sub>2</sub>O</a></li>
+                                                                        <li><a class="hitran_species">O</a></li>
+                                                                        <li><a class="hitran_species">O<sub>2</sub></a></li>
+                                                                        <li><a class="hitran_species">O<sub>3</sub></a></li>
+                                                                        <li><a class="hitran_species">OCS</a></li>
+                                                                        <li><a class="hitran_species">OH</a></li>
+                                                                        <li><a class="hitran_species">PH<sub>3</sub></a></li>
+                                                                        <li><a class="hitran_species">SO<sub>2</sub></a></li>
+                                                                        <li><b><a class="hitran_species">None</a></b></li>
+                                                                    </ul>
+                                                                </div>
+                                                                <br>
+                                                                <b><u>HITEMP 2010</u></b><br>
+                                                                <h6>Note: HITEMP simulations take roughly 5 times longer than HITRAN simulations</h6>
+                                                                <div class="row" style="width: 400px;">
+                                                                    <ul class="list-unstyled col-xs-4">
+                                                                        <li><a class="hitran_species">CO<sub><span class="db" style="display:none"> HITEMP</span><sub></sub></sub></a></li>
+                                                                        <li><a class="hitran_species">CO<sub>2</sub><sub><span class="db" style="display:none"> HITEMP</span><sub></sub></sub></a></li>
+                                                                    </ul>
+                                                                    <ul class="list-unstyled col-xs-4">
+                                                                        <li><a class="hitran_species">H<sub>2</sub>O<sub><span class="db" style="display:none"> HITEMP</span><sub></sub></sub></a></li>
+                                                                    </ul>
+                                                                    <ul class="list-unstyled col-xs-4">
+                                                                        <li><a class="hitran_species">NO<sub><span class="db" style="display:none"> HITEMP</span><sub></sub></sub></a></li>
+                                                                        <li><a class="hitran_species">OH<sub><span class="db" style="display:none"> HITEMP</span><sub></sub></sub></a></li>
+                                                                        <li><b><a class="hitran_species">None</a></b></li>
+                                                                    </ul>
+                                                                </div>
+                                                            </li>
+                                                        </ul>
+                                                    </li>
+                                                </ul>
+                                            </div>
+                                        </td>
+                                        <td style="width:175px;">χ<sub><span id="xspec1_hitran" class="specspan">CO</span></sub> = <input type="text" size="5" name="xspecies1_hitran" value=".0001" tabindex="9"></td>
+                                        <td style="width:180px;"><button class="btn btn-danger" data-loading-text="Calculating..." id="calculate_hitran">Calculate</button></td>
+                                    </tr>
+                                    <tr class="spectable">
+                                        <td></td>
+                                        <td>P (atm) = <input type="text" size="5" name="P_hitran" value="1" tabindex="2"></td>
+                                        <td>λ<sub>end</sub> (μm) = <input type="text" size="5" name="lend_hitran" value="2220" tabindex="5"></td>
+                                        <td style="text-align:center">or</td>
+                                        <td>ν<sub>end</sub> (cm<sup>-1</sup>) = <input type="text" size="5" name="vend_hitran" value="2220" tabindex="7"></td>
+                                        <td style="width:100px;text-align:center">
+                                            <div class="btn-group">
+                                                <ul id="multicol-menu" class="nav">
+                                                    <li class="dropdown">
+                                                        <a href="#" class="dropdown-toggle" data-toggle="dropdown" id="spec2_hitran"><span class="specspan" id="specspan2_hitran">Species</span><b class="caret"></b></a>
+                                                        <ul class="dropdown-menu nav disabled">
+                                                            <li>
+                                                                <b><u>HITRAN 2012</u></b>
+                                                                <div class="row" style="width: 400px;">
+                                                                    <ul class="list-unstyled col-xs-4">
+                                                                        <li><a class="hitran_species">CH<sub>3</sub>Cl</a></li>
+                                                                        <li><a class="hitran_species">CH<sub>3</sub>CN</a></li>
+                                                                        <li><a class="hitran_species">CH<sub>3</sub>OH</a></li>
+                                                                        <li><a class="hitran_species">CH<sub>4</sub></a></li>
+                                                                        <li><a class="hitran_species">CO</a></li>
+                                                                        <li><a class="hitran_species">CO<sub>2</sub></a></li>
+                                                                        <li><a class="hitran_species">COF<sub>2</sub></a></li>
+                                                                        <li><a class="hitran_species">C<sub>2</sub>H<sub>2</sub></a></li>
+                                                                        <li><a class="hitran_species">C<sub>2</sub>H<sub>4</sub></a></li>
+                                                                        <li><a class="hitran_species">C<sub>2</sub>H<sub>6</sub></a></li>
+                                                                        <li><a class="hitran_species">ClO</a></li>
+                                                                    </ul>
+                                                                    <ul class="list-unstyled col-xs-4">
+                                                                        <li><a class="hitran_species">HCOOH</a></li>
+                                                                        <li><a class="hitran_species">HCN</a></li>
+                                                                        <li><a class="hitran_species">HBr</a></li>
+                                                                        <li><a class="hitran_species">HCl</a></li>
+                                                                        <li><a class="hitran_species">HF</a></li>
+                                                                        <li><a class="hitran_species">HI</a></li>
+                                                                        <li><a class="hitran_species">HNO<sub>3</sub></a></li>
+                                                                        <li><a class="hitran_species">HOBr</a></li>
+                                                                        <li><a class="hitran_species">HOCl</a></li>
+                                                                        <li><a class="hitran_species">H<sub>2</sub>O</a></li>
+                                                                        <li><a class="hitran_species">H<sub>2</sub>O<sub>2</sub></a></li>
+                                                                        <li><a class="hitran_species">H<sub>2</sub>CO</a></li>
+                                                                        <li><a class="hitran_species">H<sub>2</sub>S</a></li>
+                                                                    </ul>
+                                                                    <ul class="list-unstyled col-xs-4">
+                                                                        <li><a class="hitran_species">NH<sub>3</sub></a></li>
+                                                                        <li><a class="hitran_species">NO</a></li>
+                                                                        <li><a class="hitran_species">NO<sub>2</sub></a></li>
+                                                                        <li><a class="hitran_species">NO+</a></li>
+                                                                        <li><a class="hitran_species">N<sub>2</sub></a></li>
+                                                                        <li><a class="hitran_species">N<sub>2</sub>O</a></li>
+                                                                        <li><a class="hitran_species">O</a></li>
+                                                                        <li><a class="hitran_species">O<sub>2</sub></a></li>
+                                                                        <li><a class="hitran_species">O<sub>3</sub></a></li>
+                                                                        <li><a class="hitran_species">OCS</a></li>
+                                                                        <li><a class="hitran_species">OH</a></li>
+                                                                        <li><a class="hitran_species">PH<sub>3</sub></a></li>
+                                                                        <li><a class="hitran_species">SO<sub>2</sub></a></li>
+                                                                        <li><b><a class="hitran_species">None</a></b></li>
+                                                                    </ul>
+                                                                </div>
+                                                                <br>
+                                                                <b><u>HITEMP 2010</u></b><br>
+                                                                <h6>Note: HITEMP simulations take roughly 5 times longer than HITRAN simulations</h6>
+                                                                <div class="row" style="width: 400px;">
+                                                                    <ul class="list-unstyled col-xs-4">
+                                                                        <li><a class="hitran_species">CO<sub><span class="db" style="display:none"> HITEMP</span><sub></sub></sub></a></li>
+                                                                        <li><a class="hitran_species">CO<sub>2</sub><sub><span class="db" style="display:none"> HITEMP</span><sub></sub></sub></a></li>
+                                                                    </ul>
+                                                                    <ul class="list-unstyled col-xs-4">
+                                                                        <li><a class="hitran_species">H<sub>2</sub>O<sub><span class="db" style="display:none"> HITEMP</span><sub></sub></sub></a></li>
+                                                                    </ul>
+                                                                    <ul class="list-unstyled col-xs-4">
+                                                                        <li><a class="hitran_species">NO<sub><span class="db" style="display:none"> HITEMP</span><sub></sub></sub></a></li>
+                                                                        <li><a class="hitran_species">OH<sub><span class="db" style="display:none"> HITEMP</span><sub></sub></sub></a></li>
+                                                                        <li><b><a class="hitran_species">None</a></b></li>
+                                                                    </ul>
+                                                                </div>
+                                                            </li>
+                                                        </ul>
+                                                    </li>
+                                                </ul>
+                                            </div>
+                                        </td>
+                                        <td>χ<sub><span id="xspec2_hitran" class="specspan">Species</span></sub> = <input type="text" size="5" name="xspecies2_hitran" value="0" tabindex="10"></td>
+                                        <td style="width:200px;"><button class="btn btn-primary" id="clear">Clear plot</button></td>
+                                    </tr>
+                                    <tr class="spectable">
+                                        <td></td>
+                                        <td>L (cm) = <input type="text" size="5" name="L_hitran" value="100" tabindex="3"></td>
+                                        <td></td>
+                                        <td></td>
+                                        <td>ν<sub>step</sub> (cm<sup>-1</sup>) = <input type="text" size="5" name="deltav_hitran" value="0.01" tabindex="8"></td>
+                                        <td style="width:100px;text-align:center">
+                                            <div class="btn-group">
+                                                <ul id="multicol-menu" class="nav">
+                                                    <li class="dropdown">
+                                                        <a href="#" class="dropdown-toggle" data-toggle="dropdown" id="spec3_hitran"><span class="specspan" id="specspan3_hitran">Species</span><b class="caret"></b></a>
+                                                        <ul class="dropdown-menu nav disabled">
+                                                            <li>
+                                                                <b><u>HITRAN 2012</u></b>
+                                                                <div class="row" style="width: 400px;">
+                                                                    <ul class="list-unstyled col-xs-4">
+                                                                        <li><a class="hitran_species">CH<sub>3</sub>Cl</a></li>
+                                                                        <li><a class="hitran_species">CH<sub>3</sub>CN</a></li>
+                                                                        <li><a class="hitran_species">CH<sub>3</sub>OH</a></li>
+                                                                        <li><a class="hitran_species">CH<sub>4</sub></a></li>
+                                                                        <li><a class="hitran_species">CO</a></li>
+                                                                        <li><a class="hitran_species">CO<sub>2</sub></a></li>
+                                                                        <li><a class="hitran_species">COF<sub>2</sub></a></li>
+                                                                        <li><a class="hitran_species">C<sub>2</sub>H<sub>2</sub></a></li>
+                                                                        <li><a class="hitran_species">C<sub>2</sub>H<sub>4</sub></a></li>
+                                                                        <li><a class="hitran_species">C<sub>2</sub>H<sub>6</sub></a></li>
+                                                                        <li><a class="hitran_species">ClO</a></li>
+                                                                    </ul>
+                                                                    <ul class="list-unstyled col-xs-4">
+                                                                        <li><a class="hitran_species">HCOOH</a></li>
+                                                                        <li><a class="hitran_species">HCN</a></li>
+                                                                        <li><a class="hitran_species">HBr</a></li>
+                                                                        <li><a class="hitran_species">HCl</a></li>
+                                                                        <li><a class="hitran_species">HF</a></li>
+                                                                        <li><a class="hitran_species">HI</a></li>
+                                                                        <li><a class="hitran_species">HNO<sub>3</sub></a></li>
+                                                                        <li><a class="hitran_species">HOBr</a></li>
+                                                                        <li><a class="hitran_species">HOCl</a></li>
+                                                                        <li><a class="hitran_species">H<sub>2</sub>O</a></li>
+                                                                        <li><a class="hitran_species">H<sub>2</sub>O<sub>2</sub></a></li>
+                                                                        <li><a class="hitran_species">H<sub>2</sub>CO</a></li>
+                                                                        <li><a class="hitran_species">H<sub>2</sub>S</a></li>
+                                                                    </ul>
+                                                                    <ul class="list-unstyled col-xs-4">
+                                                                        <li><a class="hitran_species">NH<sub>3</sub></a></li>
+                                                                        <li><a class="hitran_species">NO</a></li>
+                                                                        <li><a class="hitran_species">NO<sub>2</sub></a></li>
+                                                                        <li><a class="hitran_species">NO+</a></li>
+                                                                        <li><a class="hitran_species">N<sub>2</sub></a></li>
+                                                                        <li><a class="hitran_species">N<sub>2</sub>O</a></li>
+                                                                        <li><a class="hitran_species">O</a></li>
+                                                                        <li><a class="hitran_species">O<sub>2</sub></a></li>
+                                                                        <li><a class="hitran_species">O<sub>3</sub></a></li>
+                                                                        <li><a class="hitran_species">OCS</a></li>
+                                                                        <li><a class="hitran_species">OH</a></li>
+                                                                        <li><a class="hitran_species">PH<sub>3</sub></a></li>
+                                                                        <li><a class="hitran_species">SO<sub>2</sub></a></li>
+                                                                        <li><b><a class="hitran_species">None</a></b></li>
+                                                                    </ul>
+                                                                </div>
+                                                                <br>
+                                                                <b><u>HITEMP 2010</u></b><br>
+                                                                <h6>Note: HITEMP simulations take roughly 5 times longer than HITRAN simulations</h6>
+                                                                <div class="row" style="width: 400px;">
+                                                                    <ul class="list-unstyled col-xs-4">
+                                                                        <li><a class="hitran_species">CO<sub><span class="db" style="display:none"> HITEMP</span><sub></sub></sub></a></li>
+                                                                        <li><a class="hitran_species">CO<sub>2</sub><sub><span class="db" style="display:none"> HITEMP</span><sub></sub></sub></a></li>
+                                                                    </ul>
+                                                                    <ul class="list-unstyled col-xs-4">
+                                                                        <li><a class="hitran_species">H<sub>2</sub>O<sub><span class="db" style="display:none"> HITEMP</span><sub></sub></sub></a></li>
+                                                                    </ul>
+                                                                    <ul class="list-unstyled col-xs-4">
+                                                                        <li><a class="hitran_species">NO<sub><span class="db" style="display:none"> HITEMP</span><sub></sub></sub></a></li>
+                                                                        <li><a class="hitran_species">OH<sub><span class="db" style="display:none"> HITEMP</span><sub></sub></sub></a></li>
+                                                                        <li><b><a class="hitran_species">None</a></b></li>
+                                                                    </ul>
+                                                                </div>
+                                                            </li>
+                                                        </ul>
+                                                    </li>
+                                                </ul>
+                                            </div>
+                                        </td>
+                                        <td style="width:150px;">χ<sub><span id="xspec3_hitran" class="specspan">Species</span></sub> = <input type="text" size="5" name="xspecies3_hitran" value="0.001" tabindex="12"></td>
+                                        <td style="width:200px;"><button class="btn btn-primary" data-toggle="modal" data-target="#myModal">How it works</button></td>
+                                    </tr>
+                                    </tbody></table>
+                            </div>
+                        </div>
+                    </div>
+                    <div role="tabpanel" class="tab-pane " id="nist">
+                        <div class="row col-xs-12">
+                            <div class="col-xs-11 text-center">
+                                <table align="center" class="FrontPanel" style="table-layout: fixed;">
+                                    <tbody><tr class="spectable">
+                                        <td style="width:170px;">T<sub>elec</sub> (K) = <input type="text" size="5" name="Telec_nist" value="1000" tabindex="1"></td>
+                                        <td style="width:160px;">T (K) = <input type="text" size="5" name="T_nist" value="300" tabindex="1"></td>
+                                        <td style="width:190px;">λ<sub>start</sub> (μm) = <input type="text" size="5" name="lstart_nist" value="0.588" tabindex="4"></td>
+                                        <td style="text-align:center; width:20px;">or</td>
+                                        <td style="width:190px">ν<sub>start</sub> (cm<sup>-1</sup>) = <input type="text" size="5" name="vstart_nist" value="17006" tabindex="6"></td>
+                                        <td style="width:100px;text-align:center">
+                                            <div class="btn-group">
+                                                <ul id="multicol-menu" class="nav">
+                                                    <li class="dropdown">
+                                                        <a class="dropdown-toggle" data-toggle="dropdown" id="spec1_nist"><span class="specspan" id="specspan1_nist">Na</span><b class="caret"></b></a>
+
+                                                        <ul class="dropdown-menu nav disabled">
+                                                            <li>
+                                                                <b><u>NIST Atomic Spectra Database </u></b>
+                                                                <div class="row" style="width: 440px;">
+
+                                                                    <ul class="list-unstyled col-xs-4">
+                                                                        Ionization State:
+                                                                        <span class="nist_ion">
+            <table style="width: 400px;" class="nistTable ionstate" align="center">
+            <tbody><tr><td><button class="btn btn-default active" id="ground" style="width:40px;">X</button>
+            <button class="btn btn-default" id="plus1" style="width:40px;">X<sup>+</sup></button>
+            <button class="btn btn-default" id="plus2" style="width:40px;">X<sup>2+</sup></button></td>
+            </tr>
+            </tbody></table>
+            </span>
+
+                                                                        <table style="width: 400px;" class="nistTable" align="center">
+                                                                            <tbody><tr><td colspan="18"><hr></td></tr>
+                                                                            <tr>
+                                                                                <td><a class="nist_species">H</a></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td><a class="nist_species">He</a></td>
+                                                                            </tr>
+                                                                            <tr>
+                                                                                <td><a class="nist_species">Li</a></td>
+                                                                                <td><a class="nist_species">Be</a></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td><a class="nist_species">B</a></td>
+                                                                                <td><a class="nist_species">C</a></td>
+                                                                                <td><a class="nist_species">N</a></td>
+                                                                                <td><a class="nist_species">O</a></td>
+                                                                                <td><a class="nist_species">F</a></td>
+                                                                                <td><a class="nist_species">Ne</a></td>
+                                                                            </tr>
+                                                                            <tr>
+                                                                                <td><a class="nist_species">Na</a></td>
+                                                                                <td><a class="nist_species">Mg</a></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td><a class="nist_species">Al</a></td>
+                                                                                <td><a class="nist_species">Si</a></td>
+                                                                                <td><a class="nist_species">P</a></td>
+                                                                                <td><a class="nist_species">S</a></td>
+                                                                                <td><a class="nist_species">Cl</a></td>
+                                                                                <td><a class="nist_species">Ar</a></td>
+                                                                            </tr>
+                                                                            <tr>
+                                                                                <td><a class="nist_species">K</a></td>
+                                                                                <td><a class="nist_species">Ca</a></td>
+                                                                                <td><a class="nist_species">Sc</a></td>
+                                                                                <td><a class="nist_species">Ti</a></td>
+                                                                                <td><a class="nist_species">V</a></td>
+                                                                                <td><a class="nist_species">Cr</a></td>
+                                                                                <td><a class="nist_species">Mn</a></td>
+                                                                                <td><a class="nist_species">Fe</a></td>
+                                                                                <td><a class="nist_species">Co</a></td>
+                                                                                <td><a class="nist_species">Ni</a></td>
+                                                                                <td><a class="nist_species">Cu</a></td>
+                                                                                <td><a class="nist_species">Zn</a></td>
+                                                                                <td><a class="nist_species">Ga</a></td>
+                                                                                <td><a class="nist_species">Ge</a></td>
+                                                                                <td>As</td>
+                                                                                <td>Se</td>
+                                                                                <td><a class="nist_species">Br</a></td>
+                                                                                <td><a class="nist_species">Kr</a></td>
+                                                                            </tr>
+                                                                            <tr>
+                                                                                <td><a class="nist_species">Rb</a></td>
+                                                                                <td><a class="nist_species">Sr</a></td>
+                                                                                <td><a class="nist_species">Y</a></td>
+                                                                                <td><a class="nist_species">Zr</a></td>
+                                                                                <td>Nb</td>
+                                                                                <td><a class="nist_species">Mo</a></td>
+                                                                                <td><a class="nist_species">Tc</a></td>
+                                                                                <td><a class="nist_species">Ru</a></td>
+                                                                                <td><a class="nist_species">Rh</a></td>
+                                                                                <td><a class="nist_species">Pd</a></td>
+                                                                                <td><a class="nist_species">Ag</a></td>
+                                                                                <td><a class="nist_species">Cd</a></td>
+                                                                                <td><a class="nist_species">In</a></td>
+                                                                                <td><a class="nist_species">Sn</a></td>
+                                                                                <td><a class="nist_species">Sb</a></td>
+                                                                                <td><a class="nist_species">Te</a></td>
+                                                                                <td><a class="nist_species">I</a></td>
+                                                                                <td><a class="nist_species">Xe</a></td>
+                                                                            </tr>
+                                                                            <tr>
+                                                                                <td><a class="nist_species">Cs</a></td>
+                                                                                <td><a class="nist_species">Ba</a></td>
+                                                                                <td><a class="nist_species">Lu</a></td>
+                                                                                <td><a class="nist_species">Hf</a></td>
+                                                                                <td><a class="nist_species">Ta</a></td>
+                                                                                <td><a class="nist_species">W</a></td>
+                                                                                <td>Re</td>
+                                                                                <td>Os</td>
+                                                                                <td><a class="nist_species">Ir</a></td>
+                                                                                <td>Pt</td>
+                                                                                <td><a class="nist_species">Au</a></td>
+                                                                                <td><a class="nist_species">Hg</a></td>
+                                                                                <td><a class="nist_species">Tl</a></td>
+                                                                                <td><a class="nist_species">Pb</a></td>
+                                                                                <td><a class="nist_species">Bi</a></td>
+                                                                                <td><a class="nist_species">Po</a></td>
+                                                                                <td><a class="nist_species">At</a></td>
+                                                                                <td><a class="nist_species">Rn</a></td>
+                                                                            </tr>
+                                                                            <tr>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td>La</td>
+                                                                                <td>Ce</td>
+                                                                                <td>Pr</td>
+                                                                                <td><a class="nist_species">Nd</a></td>
+                                                                                <td><a class="nist_species">Pm</a></td>
+                                                                                <td><a class="nist_species">Sm</a></td>
+                                                                                <td><a class="nist_species">Eu</a></td>
+                                                                                <td><a class="nist_species">Gd</a></td>
+                                                                                <td><a class="nist_species">Tb</a></td>
+                                                                                <td><a class="nist_species">Dy</a></td>
+                                                                                <td><a class="nist_species">Ho</a></td>
+                                                                                <td><a class="nist_species">Er</a></td>
+                                                                                <td><a class="nist_species">Tm</a></td>
+                                                                                <td><a class="nist_species">Yb</a></td>
+                                                                                <td><a class="nist_species">Lu</a></td>
+                                                                            </tr>
+                                                                            <tr>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td>Ac</td>
+                                                                                <td>Th</td>
+                                                                                <td>Pa</td>
+                                                                                <td>U</td>
+                                                                                <td>Np</td>
+                                                                                <td>Pu</td>
+                                                                                <td>Am</td>
+                                                                                <td>Cm</td>
+                                                                                <td>Bk</td>
+                                                                                <td>Cf</td>
+                                                                                <td>Es</td>
+                                                                                <td>Fm</td>
+                                                                                <td>Md</td>
+                                                                                <td>No</td>
+                                                                                <td>Lr</td>
+                                                                            </tr>
+                                                                            </tbody></table>
+                                                                        <table>
+                                                                            <tbody><tr>
+                                                                                <td><a class="nist_species">None</a></td>
+                                                                            </tr>
+                                                                            </tbody></table>
+                                                                    </ul>
+                                                                    <!--</ul>
+                                                                    <ul class="list-unstyled col-xs-4">
+                                                                        <li>O</li>
+                                                                    </ul>
+                                                                    <ul class="list-unstyled col-xs-4">
+                                                                        <li>He</li>
+                                                                    </ul>-->
+                                                                </div>
+                                                            </li>
+                                                        </ul>
+                                                    </li>
+                                                </ul>
+                                            </div>
+                                        </td>
+                                        <td style="width:175px;">χ<sub><span id="xspec1_nist" class="specspan">Na</span></sub> = <input type="text" size="5" name="xspecies1_nist" value=".1e-6" tabindex="9"></td>
+
+                                        <td style="width:180px;"><button class="btn btn-danger" data-loading-text="Calculating..." id="calculate_nist">Calculate</button></td>
+                                    </tr>
+                                    <tr class="spectable">
+                                        <td>γ<sub>To</sub> = <input type="text" size="5" name="gammaTo" value=".3" tabindex="13"></td>
+                                        <td>P (atm) = <input type="text" size="5" name="P_nist" value="1" tabindex="2"></td>
+                                        <td>λ<sub>end</sub> (μm) = <input type="text" size="5" name="lend_nist" value=".310" tabindex="5"></td>
+                                        <td style="text-align:center">or</td>
+                                        <td>ν<sub>end</sub> (cm<sup>-1</sup>) = <input type="text" size="5" name="vend_nist" value="16949" tabindex="7"></td>
+                                        <td style="width:100px;text-align:center">
+                                            <div class="btn-group">
+                                                <ul id="multicol-menu" class="nav">
+                                                    <li class="dropdown">
+                                                        <a href="#" class="dropdown-toggle" data-toggle="dropdown" id="spec2_nist"><span class="specspan" id="specspan2_nist">Species</span><b class="caret"></b></a>
+
+                                                        <ul class="dropdown-menu nav disabled">
+                                                            <li>
+                                                                <b><u>NIST Atomic Spectra Database </u></b>
+                                                                <div class="row" style="width: 440px;">
+
+                                                                    <ul class="list-unstyled col-xs-4">
+                                                                        Ionization State:
+                                                                        <span class="nist_ion">
+            <table style="width: 400px;" class="nistTable ionstate" align="center">
+            <tbody><tr><td><button class="btn btn-default active" id="ground" style="width:40px;">X</button>
+            <button class="btn btn-default" id="plus1" style="width:40px;">X<sup>+</sup></button>
+            <button class="btn btn-default" id="plus2" style="width:40px;">X<sup>2+</sup></button></td>
+            </tr>
+            </tbody></table>
+            </span>
+
+                                                                        <table style="width: 400px;" class="nistTable" align="center">
+                                                                            <tbody><tr><td colspan="18"><hr></td></tr>
+                                                                            <tr>
+                                                                                <td><a class="nist_species">H</a></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td><a class="nist_species">He</a></td>
+                                                                            </tr>
+                                                                            <tr>
+                                                                                <td><a class="nist_species">Li</a></td>
+                                                                                <td><a class="nist_species">Be</a></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td><a class="nist_species">B</a></td>
+                                                                                <td><a class="nist_species">C</a></td>
+                                                                                <td><a class="nist_species">N</a></td>
+                                                                                <td><a class="nist_species">O</a></td>
+                                                                                <td><a class="nist_species">F</a></td>
+                                                                                <td><a class="nist_species">Ne</a></td>
+                                                                            </tr>
+                                                                            <tr>
+                                                                                <td><a class="nist_species">Na</a></td>
+                                                                                <td><a class="nist_species">Mg</a></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td><a class="nist_species">Al</a></td>
+                                                                                <td><a class="nist_species">Si</a></td>
+                                                                                <td><a class="nist_species">P</a></td>
+                                                                                <td><a class="nist_species">S</a></td>
+                                                                                <td><a class="nist_species">Cl</a></td>
+                                                                                <td><a class="nist_species">Ar</a></td>
+                                                                            </tr>
+                                                                            <tr>
+                                                                                <td><a class="nist_species">K</a></td>
+                                                                                <td><a class="nist_species">Ca</a></td>
+                                                                                <td><a class="nist_species">Sc</a></td>
+                                                                                <td><a class="nist_species">Ti</a></td>
+                                                                                <td><a class="nist_species">V</a></td>
+                                                                                <td><a class="nist_species">Cr</a></td>
+                                                                                <td><a class="nist_species">Mn</a></td>
+                                                                                <td><a class="nist_species">Fe</a></td>
+                                                                                <td><a class="nist_species">Co</a></td>
+                                                                                <td><a class="nist_species">Ni</a></td>
+                                                                                <td><a class="nist_species">Cu</a></td>
+                                                                                <td><a class="nist_species">Zn</a></td>
+                                                                                <td><a class="nist_species">Ga</a></td>
+                                                                                <td><a class="nist_species">Ge</a></td>
+                                                                                <td>As</td>
+                                                                                <td>Se</td>
+                                                                                <td><a class="nist_species">Br</a></td>
+                                                                                <td><a class="nist_species">Kr</a></td>
+                                                                            </tr>
+                                                                            <tr>
+                                                                                <td><a class="nist_species">Rb</a></td>
+                                                                                <td><a class="nist_species">Sr</a></td>
+                                                                                <td><a class="nist_species">Y</a></td>
+                                                                                <td><a class="nist_species">Zr</a></td>
+                                                                                <td>Nb</td>
+                                                                                <td><a class="nist_species">Mo</a></td>
+                                                                                <td><a class="nist_species">Tc</a></td>
+                                                                                <td><a class="nist_species">Ru</a></td>
+                                                                                <td><a class="nist_species">Rh</a></td>
+                                                                                <td><a class="nist_species">Pd</a></td>
+                                                                                <td><a class="nist_species">Ag</a></td>
+                                                                                <td><a class="nist_species">Cd</a></td>
+                                                                                <td><a class="nist_species">In</a></td>
+                                                                                <td><a class="nist_species">Sn</a></td>
+                                                                                <td><a class="nist_species">Sb</a></td>
+                                                                                <td><a class="nist_species">Te</a></td>
+                                                                                <td><a class="nist_species">I</a></td>
+                                                                                <td><a class="nist_species">Xe</a></td>
+                                                                            </tr>
+                                                                            <tr>
+                                                                                <td><a class="nist_species">Cs</a></td>
+                                                                                <td><a class="nist_species">Ba</a></td>
+                                                                                <td><a class="nist_species">Lu</a></td>
+                                                                                <td><a class="nist_species">Hf</a></td>
+                                                                                <td><a class="nist_species">Ta</a></td>
+                                                                                <td><a class="nist_species">W</a></td>
+                                                                                <td>Re</td>
+                                                                                <td>Os</td>
+                                                                                <td><a class="nist_species">Ir</a></td>
+                                                                                <td>Pt</td>
+                                                                                <td><a class="nist_species">Au</a></td>
+                                                                                <td><a class="nist_species">Hg</a></td>
+                                                                                <td><a class="nist_species">Tl</a></td>
+                                                                                <td><a class="nist_species">Pb</a></td>
+                                                                                <td><a class="nist_species">Bi</a></td>
+                                                                                <td><a class="nist_species">Po</a></td>
+                                                                                <td><a class="nist_species">At</a></td>
+                                                                                <td><a class="nist_species">Rn</a></td>
+                                                                            </tr>
+                                                                            <tr>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td>La</td>
+                                                                                <td>Ce</td>
+                                                                                <td>Pr</td>
+                                                                                <td><a class="nist_species">Nd</a></td>
+                                                                                <td><a class="nist_species">Pm</a></td>
+                                                                                <td><a class="nist_species">Sm</a></td>
+                                                                                <td><a class="nist_species">Eu</a></td>
+                                                                                <td><a class="nist_species">Gd</a></td>
+                                                                                <td><a class="nist_species">Tb</a></td>
+                                                                                <td><a class="nist_species">Dy</a></td>
+                                                                                <td><a class="nist_species">Ho</a></td>
+                                                                                <td><a class="nist_species">Er</a></td>
+                                                                                <td><a class="nist_species">Tm</a></td>
+                                                                                <td><a class="nist_species">Yb</a></td>
+                                                                                <td><a class="nist_species">Lu</a></td>
+                                                                            </tr>
+                                                                            <tr>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td>Ac</td>
+                                                                                <td>Th</td>
+                                                                                <td>Pa</td>
+                                                                                <td>U</td>
+                                                                                <td>Np</td>
+                                                                                <td>Pu</td>
+                                                                                <td>Am</td>
+                                                                                <td>Cm</td>
+                                                                                <td>Bk</td>
+                                                                                <td>Cf</td>
+                                                                                <td>Es</td>
+                                                                                <td>Fm</td>
+                                                                                <td>Md</td>
+                                                                                <td>No</td>
+                                                                                <td>Lr</td>
+                                                                            </tr>
+                                                                            </tbody></table>
+                                                                        <table>
+                                                                            <tbody><tr>
+                                                                                <td><a class="nist_species">None</a></td>
+                                                                            </tr>
+                                                                            </tbody></table>
+                                                                    </ul>
+                                                                    <!--</ul>
+                                                                    <ul class="list-unstyled col-xs-4">
+                                                                        <li>O</li>
+                                                                    </ul>
+                                                                    <ul class="list-unstyled col-xs-4">
+                                                                        <li>He</li>
+                                                                    </ul>-->
+                                                                </div>
+                                                            </li>
+                                                        </ul>
+                                                    </li>
+                                                </ul>
+                                            </div>
+                                        </td>
+                                        <td style="width:150px;">χ<sub><span id="xspec2_nist" class="specspan">Species</span></sub> = <input type="text" size="5" name="xspecies2_nist" value="0" tabindex="10"></td>
+                                        <td><button class="btn btn-primary" id="clear">Clear plot</button></td>
+                                    </tr>
+                                    <tr class="spectable">
+                                        <td>n = <input type="text" size="5" name="n" value=".3" tabindex="12"></td>
+                                        <td>L (cm) = <input type="text" size="5" name="L_nist" value="1" tabindex="3"></td>
+                                        <td></td>
+                                        <td></td>
+                                        <td>ν<sub>step</sub> (cm<sup>-1</sup>) = <input type="text" size="5" name="deltav_nist" value="0.01" tabindex="8"></td>
+                                        <td style="width:100px;text-align:center">
+                                            <div class="btn-group">
+                                                <ul id="multicol-menu" class="nav">
+                                                    <li class="dropdown">
+                                                        <a href="#" class="dropdown-toggle" data-toggle="dropdown" id="spec3_nist"><span class="specspan" id="specspan3_nist">Species</span><b class="caret"></b></a>
+
+                                                        <ul class="dropdown-menu nav disabled">
+                                                            <li>
+                                                                <b><u>NIST Atomic Spectra Database </u></b>
+                                                                <div class="row" style="width: 440px;">
+
+                                                                    <ul class="list-unstyled col-xs-4">
+                                                                        Ionization State:
+                                                                        <span class="nist_ion">
+            <table style="width: 400px;" class="nistTable ionstate" align="center">
+            <tbody><tr><td><button class="btn btn-default active" id="ground" style="width:40px;">X</button>
+            <button class="btn btn-default" id="plus1" style="width:40px;">X<sup>+</sup></button>
+            <button class="btn btn-default" id="plus2" style="width:40px;">X<sup>2+</sup></button></td>
+            </tr>
+            </tbody></table>
+            </span>
+
+                                                                        <table style="width: 400px;" class="nistTable" align="center">
+                                                                            <tbody><tr><td colspan="18"><hr></td></tr>
+                                                                            <tr>
+                                                                                <td><a class="nist_species">H</a></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td><a class="nist_species">He</a></td>
+                                                                            </tr>
+                                                                            <tr>
+                                                                                <td><a class="nist_species">Li</a></td>
+                                                                                <td><a class="nist_species">Be</a></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td><a class="nist_species">B</a></td>
+                                                                                <td><a class="nist_species">C</a></td>
+                                                                                <td><a class="nist_species">N</a></td>
+                                                                                <td><a class="nist_species">O</a></td>
+                                                                                <td><a class="nist_species">F</a></td>
+                                                                                <td><a class="nist_species">Ne</a></td>
+                                                                            </tr>
+                                                                            <tr>
+                                                                                <td><a class="nist_species">Na</a></td>
+                                                                                <td><a class="nist_species">Mg</a></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td><a class="nist_species">Al</a></td>
+                                                                                <td><a class="nist_species">Si</a></td>
+                                                                                <td><a class="nist_species">P</a></td>
+                                                                                <td><a class="nist_species">S</a></td>
+                                                                                <td><a class="nist_species">Cl</a></td>
+                                                                                <td><a class="nist_species">Ar</a></td>
+                                                                            </tr>
+                                                                            <tr>
+                                                                                <td><a class="nist_species">K</a></td>
+                                                                                <td><a class="nist_species">Ca</a></td>
+                                                                                <td><a class="nist_species">Sc</a></td>
+                                                                                <td><a class="nist_species">Ti</a></td>
+                                                                                <td><a class="nist_species">V</a></td>
+                                                                                <td><a class="nist_species">Cr</a></td>
+                                                                                <td><a class="nist_species">Mn</a></td>
+                                                                                <td><a class="nist_species">Fe</a></td>
+                                                                                <td><a class="nist_species">Co</a></td>
+                                                                                <td><a class="nist_species">Ni</a></td>
+                                                                                <td><a class="nist_species">Cu</a></td>
+                                                                                <td><a class="nist_species">Zn</a></td>
+                                                                                <td><a class="nist_species">Ga</a></td>
+                                                                                <td><a class="nist_species">Ge</a></td>
+                                                                                <td>As</td>
+                                                                                <td>Se</td>
+                                                                                <td><a class="nist_species">Br</a></td>
+                                                                                <td><a class="nist_species">Kr</a></td>
+                                                                            </tr>
+                                                                            <tr>
+                                                                                <td><a class="nist_species">Rb</a></td>
+                                                                                <td><a class="nist_species">Sr</a></td>
+                                                                                <td><a class="nist_species">Y</a></td>
+                                                                                <td><a class="nist_species">Zr</a></td>
+                                                                                <td>Nb</td>
+                                                                                <td><a class="nist_species">Mo</a></td>
+                                                                                <td><a class="nist_species">Tc</a></td>
+                                                                                <td><a class="nist_species">Ru</a></td>
+                                                                                <td><a class="nist_species">Rh</a></td>
+                                                                                <td><a class="nist_species">Pd</a></td>
+                                                                                <td><a class="nist_species">Ag</a></td>
+                                                                                <td><a class="nist_species">Cd</a></td>
+                                                                                <td><a class="nist_species">In</a></td>
+                                                                                <td><a class="nist_species">Sn</a></td>
+                                                                                <td><a class="nist_species">Sb</a></td>
+                                                                                <td><a class="nist_species">Te</a></td>
+                                                                                <td><a class="nist_species">I</a></td>
+                                                                                <td><a class="nist_species">Xe</a></td>
+                                                                            </tr>
+                                                                            <tr>
+                                                                                <td><a class="nist_species">Cs</a></td>
+                                                                                <td><a class="nist_species">Ba</a></td>
+                                                                                <td><a class="nist_species">Lu</a></td>
+                                                                                <td><a class="nist_species">Hf</a></td>
+                                                                                <td><a class="nist_species">Ta</a></td>
+                                                                                <td><a class="nist_species">W</a></td>
+                                                                                <td>Re</td>
+                                                                                <td>Os</td>
+                                                                                <td><a class="nist_species">Ir</a></td>
+                                                                                <td>Pt</td>
+                                                                                <td><a class="nist_species">Au</a></td>
+                                                                                <td><a class="nist_species">Hg</a></td>
+                                                                                <td><a class="nist_species">Tl</a></td>
+                                                                                <td><a class="nist_species">Pb</a></td>
+                                                                                <td><a class="nist_species">Bi</a></td>
+                                                                                <td><a class="nist_species">Po</a></td>
+                                                                                <td><a class="nist_species">At</a></td>
+                                                                                <td><a class="nist_species">Rn</a></td>
+                                                                            </tr>
+                                                                            <tr>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td>La</td>
+                                                                                <td>Ce</td>
+                                                                                <td>Pr</td>
+                                                                                <td><a class="nist_species">Nd</a></td>
+                                                                                <td><a class="nist_species">Pm</a></td>
+                                                                                <td><a class="nist_species">Sm</a></td>
+                                                                                <td><a class="nist_species">Eu</a></td>
+                                                                                <td><a class="nist_species">Gd</a></td>
+                                                                                <td><a class="nist_species">Tb</a></td>
+                                                                                <td><a class="nist_species">Dy</a></td>
+                                                                                <td><a class="nist_species">Ho</a></td>
+                                                                                <td><a class="nist_species">Er</a></td>
+                                                                                <td><a class="nist_species">Tm</a></td>
+                                                                                <td><a class="nist_species">Yb</a></td>
+                                                                                <td><a class="nist_species">Lu</a></td>
+                                                                            </tr>
+                                                                            <tr>
+                                                                                <td></td>
+                                                                                <td></td>
+                                                                                <td>Ac</td>
+                                                                                <td>Th</td>
+                                                                                <td>Pa</td>
+                                                                                <td>U</td>
+                                                                                <td>Np</td>
+                                                                                <td>Pu</td>
+                                                                                <td>Am</td>
+                                                                                <td>Cm</td>
+                                                                                <td>Bk</td>
+                                                                                <td>Cf</td>
+                                                                                <td>Es</td>
+                                                                                <td>Fm</td>
+                                                                                <td>Md</td>
+                                                                                <td>No</td>
+                                                                                <td>Lr</td>
+                                                                            </tr>
+                                                                            </tbody></table>
+                                                                        <table>
+                                                                            <tbody><tr>
+                                                                                <td><a class="nist_species">None</a></td>
+                                                                            </tr>
+                                                                            </tbody></table>
+                                                                    </ul>
+                                                                    <!--</ul>
+                                                                    <ul class="list-unstyled col-xs-4">
+                                                                        <li>O</li>
+                                                                    </ul>
+                                                                    <ul class="list-unstyled col-xs-4">
+                                                                        <li>He</li>
+                                                                    </ul>-->
+                                                                </div>
+                                                            </li>
+                                                        </ul>
+                                                    </li>
+                                                </ul>
+                                            </div>
+                                        </td>
+                                        <td style="width:150px;">χ<sub><span id="xspec3_nist" class="specspan">Species</span></sub> = <input type="text" size="5" name="xspecies3_nist" value="0.001" tabindex="11"></td>
+                                        <td><button class="btn btn-primary" data-toggle="modal" data-target="#nistModal">How it works</button></td>
+                                    </tr>
+                                    </tbody></table>
+                            </div>
+                        </div> <!-- end of the row of inputs, buttons, etc. -->
+                    </div>
+                </div>  <!-- tab content -->
+            </div>  <!-- tab panel -->
+        </div>  <!-- row -->
+
+
+
+        <div class="row col-xs-12"><!-- the horizontal ruler-->
+            <div class="col-xs-12"><hr></div>
+        </div> <!-- row -->
+
+    </div> <!-- container -->
+</section>	<!-- end of the top part - above the plot -->
+
+<section>
+    <div class="container-fluid">
+        <div class="row col-xs-12">
+            <div class="col-xs-2 col-xs-offset-1 text-left" id="topofplot">
+                <input type="checkbox" name="autoscaleY" id="autoscaleY"> Autoscale Y
+            </div>
+            <div class="col-xs-5 col-xs-offset-1 text-left">
+            </div>
+            <div class="col-xs-2">
+                <button class="btn btn-primary" id="data" style="width:170px;">Save to CSV</button>
+                <div id="downloaddiv" style="display: none;"><form id="exportform" action="/_saveCSV" method="post"><textarea name="data">{"line0":[{"abs":3.3623173691552106e-17,"nu":2195},{"abs":0.0007011959247941411,"nu":2195.01},{"abs":0.0007004413584791993,"nu":2195.0200000000004},{"abs":0.0006998402809782643,"nu":2195.0300000000007},{"abs":0.0006993925027486749,"nu":2195.040000000001},{"abs":0.0006990979464771527,"nu":2195.050000000001},{"abs":0.0006989566472022753,"nu":2195.0600000000013},{"abs":0.0006989687525573548,"nu":2195.0700000000015},{"abs":0.0006991345231108252,"nu":2195.0800000000017},{"abs":0.0006994543329070958,"nu":2195.090000000002},{"abs":0.0006999286702387661,"nu":2195.100000000002},{"abs":0.0007005581386146084,"nu":2195.1100000000024},{"abs":0.0007013434579075218,"nu":2195.1200000000026},{"abs":0.0007022854656868697,"nu":2195.130000000003},{"abs":0.0007033851187434398,"nu":2195.140000000003},{"abs":0.0007046434948140583,"nu":2195.1500000000033},{"abs":0.0007060617945124387,"nu":2195.1600000000035},{"abs":0.0007076413434733649,"nu":2195.1700000000037},{"abs":0.0007093835947175736,"nu":2195.180000000004},{"abs":0.0007112901312457238,"nu":2195.190000000004},{"abs":0.0007133626688712126,"nu":2195.2000000000044},{"abs":0.0007156030593018736,"nu":2195.2100000000046},{"abs":0.0007180132934827207,"nu":2195.220000000005},{"abs":0.0007205955052126222,"nu":2195.230000000005},{"abs":0.0007233519750496243,"nu":2195.2400000000052},{"abs":0.000726285134521375,"nu":2195.2500000000055},{"abs":0.0007293975706590397,"nu":2195.2600000000057},{"abs":0.000732692030875444,"nu":2195.270000000006},{"abs":0.0007361714282108708,"nu":2195.280000000006},{"abs":0.0007398388469731795,"nu":2195.2900000000063},{"abs":0.0007436975488024921,"nu":2195.3000000000065},{"abs":0.0007477509791953325,"nu":2195.3100000000068},{"abs":0.000752002774528577,"nu":2195.320000000007},{"abs":0.0007564567696297773,"nu":2195.330000000007},{"abs":0.0007611170059491254,"nu":2195.3400000000074},{"abs":0.0007659877403976448,"nu":2195.3500000000076},{"abs":0.0007710734549293721,"nu":2195.360000000008},{"abs":0.000776378866960746,"nu":2195.370000000008},{"abs":0.0007819089407408805,"nu":2195.3800000000083},{"abs":0.0007876688998121182,"nu":2195.3900000000085},{"abs":0.0007936642407346726,"nu":2195.4000000000087},{"abs":0.0007999007482929239,"nu":2195.410000000009},{"abs":0.0008063845124604038,"nu":2195.420000000009},{"abs":0.0008131219474791367,"nu":2195.4300000000094},{"abs":0.0008201198135156577,"nu":2195.4400000000096},{"abs":0.0008273852415018841,"nu":2195.45000000001},{"abs":0.0008349257619702591,"nu":2195.46000000001},{"abs":0.0008427493389731714,"nu":2195.4700000000103},{"abs":0.0008508644105729045,"nu":2195.4800000000105},{"abs":0.0008592799379525311,"nu":2195.4900000000107},{"abs":0.0008680054660112172,"nu":2195.500000000011},{"abs":0.0008770511994918674,"nu":2195.510000000011},{"abs":0.0008864281004293795,"nu":2195.5200000000114},{"abs":0.0008961480152911025,"nu":2195.5300000000116},{"abs":0.0009062238440392381,"nu":2195.540000000012},{"abs":0.0009166697691281073,"nu":2195.550000000012},{"abs":0.0009275015710914842,"nu":2195.560000000012},{"abs":0.0009387370700985957,"nu":2195.5700000000124},{"abs":0.000950396750863263,"nu":2195.5800000000127},{"abs":0.0009625046513685992,"nu":2195.590000000013},{"abs":0.0009750896175882808,"nu":2195.600000000013},{"abs":0.0009881870190767098,"nu":2195.6100000000133},{"abs":0.0010018408909387702,"nu":2195.6200000000135},{"abs":0.0010161059373010159,"nu":2195.6300000000138},{"abs":0.0010310471502857695,"nu":2195.640000000014},{"abs":0.0010467303288957705,"nu":2195.650000000014},{"abs":0.0010631878507789292,"nu":2195.6600000000144},{"abs":0.0010803384106229837,"nu":2195.6700000000146},{"abs":0.001097883249422262,"nu":2195.680000000015},{"abs":0.0011153509951545102,"nu":2195.690000000015},{"abs":0.0011324690380500886,"nu":2195.7000000000153},{"abs":0.0011494871217330488,"nu":2195.7100000000155},{"abs":0.0011669400053000586,"nu":2195.7200000000157},{"abs":0.001185237531307153,"nu":2195.730000000016},{"abs":0.0012045662202817616,"nu":2195.740000000016},{"abs":0.0012249856240334055,"nu":2195.7500000000164},{"abs":0.0012465176980047208,"nu":2195.7600000000166},{"abs":0.0012691835002638812,"nu":2195.770000000017},{"abs":0.0012929991346060917,"nu":2195.780000000017},{"abs":0.0013179368186647083,"nu":2195.7900000000172},{"abs":0.001343856629107633,"nu":2195.8000000000175},{"abs":0.0013704640723001115,"nu":2195.8100000000177},{"abs":0.0013974233583677375,"nu":2195.820000000018},{"abs":0.0014246374356938272,"nu":2195.830000000018},{"abs":0.0014523775024175656,"nu":2195.8400000000183},{"abs":0.00148107098995991,"nu":2195.8500000000186},{"abs":0.0015110473902883801,"nu":2195.8600000000188},{"abs":0.0015424794488971337,"nu":2195.870000000019},{"abs":0.0015754417022408507,"nu":2195.880000000019},{"abs":0.001609971740142492,"nu":2195.8900000000194},{"abs":0.0016461031543677823,"nu":2195.9000000000196},{"abs":0.0017267868268437568,"nu":2195.91000000002},{"abs":0.0017664743158058295,"nu":2195.92000000002},{"abs":0.0018079279112174912,"nu":2195.9300000000203},{"abs":0.0018512252922967887,"nu":2195.9400000000205},{"abs":0.0018964545850738853,"nu":2195.9500000000207},{"abs":0.001943713878182235,"nu":2195.960000000021},{"abs":0.001993111053750972,"nu":2195.970000000021},{"abs":0.0020447638928490783,"nu":2195.9800000000214},{"abs":0.002098800409471813,"nu":2195.9900000000216},{"abs":0.0021553593770679232,"nu":2196.000000000022},{"abs":0.0022145910238423896,"nu":2196.010000000022},{"abs":0.002276657883749075,"nu":2196.0200000000223},{"abs":0.00234173579863389,"nu":2196.0300000000225},{"abs":0.0024100150737616146,"nu":2196.0400000000227},{"abs":0.0024817017944999418,"nu":2196.050000000023},{"abs":0.002557019316726351,"nu":2196.060000000023},{"abs":0.0026362099479534007,"nu":2196.0700000000234},{"abs":0.0027195368405464495,"nu":2196.0800000000236},{"abs":0.0028072861229781897,"nu":2196.090000000024},{"abs":0.002899769300044594,"nu":2196.100000000024},{"abs":0.0029973259585584907,"nu":2196.1100000000242},{"abs":0.0031003268214424566,"nu":2196.1200000000244},{"abs":0.0032091772005882727,"nu":2196.1300000000247},{"abs":0.003324320907584228,"nu":2196.140000000025},{"abs":0.0034462446917348667,"nu":2196.150000000025},{"abs":0.0035754832870646576,"nu":2196.1600000000253},{"abs":0.003712625164642936,"nu":2196.1700000000255},{"abs":0.0038583191041255765,"nu":2196.1800000000258},{"abs":0.004013281719539743,"nu":2196.190000000026},{"abs":0.004178306099865699,"nu":2196.200000000026},{"abs":0.004354271755920866,"nu":2196.2100000000264},{"abs":0.004542156102726437,"nu":2196.2200000000266},{"abs":0.0047430477525682805,"nu":2196.230000000027},{"abs":0.004958161950432871,"nu":2196.240000000027},{"abs":0.0051888585530578445,"nu":2196.2500000000273},{"abs":0.005436663038884895,"nu":2196.2600000000275},{"abs":0.0057032912958477075,"nu":2196.2700000000277},{"abs":0.0059906779990464626,"nu":2196.280000000028},{"abs":0.006301011760389265,"nu":2196.290000000028},{"abs":0.006636775108933594,"nu":2196.3000000000284},{"abs":0.007000792957144271,"nu":2196.3100000000286},{"abs":0.007396290349191974,"nu":2196.320000000029},{"abs":0.007826961776146876,"nu":2196.330000000029},{"abs":0.008297054716026717,"nu":2196.3400000000292},{"abs":0.008811470677268262,"nu":2196.3500000000295},{"abs":0.009375887685889527,"nu":2196.3600000000297},{"abs":0.009996908772672862,"nu":2196.37000000003},{"abs":0.010682241961844644,"nu":2196.38000000003},{"abs":0.011440921386452451,"nu":2196.3900000000303},{"abs":0.012283591897647278,"nu":2196.4000000000306},{"abs":0.01322288849832385,"nu":2196.410000000031},{"abs":0.014273911139271494,"nu":2196.420000000031},{"abs":0.015454780663565057,"nu":2196.430000000031},{"abs":0.016787334124678168,"nu":2196.4400000000314},{"abs":0.018298048069374594,"nu":2196.4500000000317},{"abs":0.020019250968550964,"nu":2196.460000000032},{"abs":0.021990700694940305,"nu":2196.470000000032},{"abs":0.024261647879634314,"nu":2196.4800000000323},{"abs":0.026893556149578456,"nu":2196.4900000000325},{"abs":0.029963711226817357,"nu":2196.5000000000327},{"abs":0.03357003040649878,"nu":2196.510000000033},{"abs":0.03783748341853094,"nu":2196.520000000033},{"abs":0.04292664562566269,"nu":2196.5300000000334},{"abs":0.04904498830951194,"nu":2196.5400000000336},{"abs":0.05646146362367497,"nu":2196.550000000034},{"abs":0.06552449518513416,"nu":2196.560000000034},{"abs":0.0766819947956611,"nu":2196.5700000000343},{"abs":0.09049802894579144,"nu":2196.5800000000345},{"abs":0.10765117657762427,"nu":2196.5900000000347},{"abs":0.12887882454635388,"nu":2196.600000000035},{"abs":0.15479263812427935,"nu":2196.610000000035},{"abs":0.18543758575555494,"nu":2196.6200000000354},{"abs":0.21946415667107494,"nu":2196.6300000000356},{"abs":0.2530448963998623,"nu":2196.640000000036},{"abs":0.27946765354473624,"nu":2196.650000000036},{"abs":0.2911072314239879,"nu":2196.6600000000362},{"abs":0.28389862626702467,"nu":2196.6700000000365},{"abs":0.260411526120381,"nu":2196.6800000000367},{"abs":0.22785774115048257,"nu":2196.690000000037},{"abs":0.1934727906736747,"nu":2196.700000000037},{"abs":0.16180730907265706,"nu":2196.7100000000373},{"abs":0.13471399048661803,"nu":2196.7200000000375},{"abs":0.11239418964398934,"nu":2196.7300000000378},{"abs":0.09432008413408818,"nu":2196.740000000038},{"abs":0.07976059025309433,"nu":2196.750000000038},{"abs":0.06801448089239027,"nu":2196.7600000000384},{"abs":0.05848853186726094,"nu":2196.7700000000386},{"abs":0.05070785552787052,"nu":2196.780000000039},{"abs":0.044301750232292506,"nu":2196.790000000039},{"abs":0.03898376325965834,"nu":2196.8000000000393},{"abs":0.03453298793398472,"nu":2196.8100000000395},{"abs":0.030778630917371666,"nu":2196.8200000000397},{"abs":0.027587966888461803,"nu":2196.83000000004},{"abs":0.024857178695277787,"nu":2196.84000000004},{"abs":0.022504471214755593,"nu":2196.8500000000404},{"abs":0.02046491289098268,"nu":2196.8600000000406},{"abs":0.01868656764625746,"nu":2196.870000000041},{"abs":0.017127583700761465,"nu":2196.880000000041},{"abs":0.015753991019776186,"nu":2196.8900000000413},{"abs":0.014538024577760765,"nu":2196.9000000000415},{"abs":0.01345683937584325,"nu":2196.9100000000417},{"abs":0.012491518880691681,"nu":2196.920000000042},{"abs":0.01162630264162905,"nu":2196.930000000042},{"abs":0.01084799120039492,"nu":2196.9400000000423},{"abs":0.010145459755632774,"nu":2196.9500000000426},{"abs":0.00950928946806561,"nu":2196.960000000043},{"abs":0.008931465218014816,"nu":2196.970000000043},{"abs":0.00840513454193261,"nu":2196.980000000043},{"abs":0.00792441299081893,"nu":2196.9900000000434},{"abs":0.007484226084324739,"nu":2197.0000000000437},{"abs":0.007080180285704085,"nu":2197.010000000044},{"abs":0.006708457122658339,"nu":2197.020000000044},{"abs":0.006365725870454457,"nu":2197.0300000000443},{"abs":0.006049071200574549,"nu":2197.0400000000445},{"abs":0.005755932956823937,"nu":2197.0500000000447},{"abs":0.005484055807355018,"nu":2197.060000000045},{"abs":0.005231446977048392,"nu":2197.070000000045},{"abs":0.004996340621172933,"nu":2197.0800000000454},{"abs":0.004777167681435346,"nu":2197.0900000000456},{"abs":0.004572530286748795,"nu":2197.100000000046},{"abs":0.004381179936603368,"nu":2197.110000000046},{"abs":0.004201998844958365,"nu":2197.1200000000463},{"abs":0.004033983934775934,"nu":2197.1300000000465},{"abs":0.0038762312503642826,"nu":2197.1400000000467},{"abs":0.0037279313293396084,"nu":2197.150000000047},{"abs":0.003588348003144707,"nu":2197.160000000047},{"abs":0.0034568167420834114,"nu":2197.1700000000474},{"abs":0.0033327350562278634,"nu":2197.1800000000476},{"abs":0.0032155557097815115,"nu":2197.190000000048},{"abs":0.0031047807862549987,"nu":2197.200000000048},{"abs":0.0029999564863689297,"nu":2197.2100000000482},{"abs":0.002900668559167861,"nu":2197.2200000000485},{"abs":0.002806538282451906,"nu":2197.2300000000487},{"abs":0.0027172189429044346,"nu":2197.240000000049},{"abs":0.002632392630947342,"nu":2197.250000000049},{"abs":0.0025517676155681355,"nu":2197.2600000000493},{"abs":0.0024750758404379165,"nu":2197.2700000000495},{"abs":0.0024020708233858726,"nu":2197.2800000000498},{"abs":0.0023325258092287333,"nu":2197.29000000005},{"abs":0.0022662321765063685,"nu":2197.30000000005},{"abs":0.0022029980736867297,"nu":2197.3100000000504},{"abs":0.0021426472325452206,"nu":2197.3200000000506},{"abs":0.0020850178156482935,"nu":2197.330000000051},{"abs":0.0020299609133306025,"nu":2197.340000000051},{"abs":0.001977337766819763,"nu":2197.3500000000513},{"abs":0.0019270139427062334,"nu":2197.3600000000515},{"abs":0.0018134107061946216,"nu":2197.3700000000517},{"abs":0.0017675694177390344,"nu":2197.380000000052},{"abs":0.0017235507346968697,"nu":2197.390000000052},{"abs":0.0016812042391403576,"nu":2197.4000000000524},{"abs":0.0016404467368346136,"nu":2197.4100000000526},{"abs":0.0016012506912749661,"nu":2197.420000000053},{"abs":0.0015635939781152982,"nu":2197.430000000053},{"abs":0.001527432147950717,"nu":2197.4400000000533},{"abs":0.0014927018222114115,"nu":2197.4500000000535},{"abs":0.0014593323444423456,"nu":2197.4600000000537},{"abs":0.0014272535605998739,"nu":2197.470000000054},{"abs":0.0013963991057622084,"nu":2197.480000000054},{"abs":0.0013667078313251185,"nu":2197.4900000000544},{"abs":0.0013381213873966227,"nu":2197.5000000000546},{"abs":0.0013105872521828167,"nu":2197.510000000055},{"abs":0.001284055996507496,"nu":2197.520000000055},{"abs":0.0012584814589370144,"nu":2197.530000000055},{"abs":0.0012338204101507216,"nu":2197.5400000000554},{"abs":0.001210032272378179,"nu":2197.5500000000557},{"abs":0.0011870788833985965,"nu":2197.560000000056},{"abs":0.0011649242954566885,"nu":2197.570000000056},{"abs":0.0011435346014489422,"nu":2197.5800000000563},{"abs":0.0011228777826318014,"nu":2197.5900000000565},{"abs":0.0011029235735994193,"nu":2197.6000000000568},{"abs":0.0010836433413829768,"nu":2197.610000000057},{"abs":0.0010650099763161549,"nu":2197.620000000057},{"abs":0.0010469977928753956,"nu":2197.6300000000574},{"abs":0.0010295824391076955,"nu":2197.6400000000576},{"abs":0.0010127408135490667,"nu":2197.650000000058},{"abs":0.0009964509887503052,"nu":2197.660000000058},{"abs":0.0009806921406843342,"nu":2197.6700000000583},{"abs":0.0009654444834292976,"nu":2197.6800000000585},{"abs":0.0009506892086137807,"nu":2197.6900000000587},{"abs":0.0009364084291829642,"nu":2197.700000000059},{"abs":0.0009225851271022237,"nu":2197.710000000059},{"abs":0.0009092031046620171,"nu":2197.7200000000594},{"abs":0.0008962469390868374,"nu":2197.7300000000596},{"abs":0.0008837019401834463,"nu":2197.74000000006},{"abs":0.0008715541107920524,"nu":2197.75000000006},{"abs":0.0008597901098272233,"nu":2197.7600000000602},{"abs":0.0008483972177173326,"nu":2197.7700000000605},{"abs":0.000837363304068817,"nu":2197.7800000000607},{"abs":0.0008266767973986326,"nu":2197.790000000061},{"abs":0.000816326656792847,"nu":2197.800000000061},{"abs":0.0008063023453628299,"nu":2197.8100000000613},{"abs":0.0007965938053829098,"nu":2197.8200000000616},{"abs":0.0007871914350051431,"nu":2197.830000000062},{"abs":0.0007780860664576792,"nu":2197.840000000062},{"abs":0.000769268945644073,"nu":2197.850000000062},{"abs":0.0007607317130713287,"nu":2197.8600000000624},{"abs":0.0007524663860456175,"nu":2197.8700000000626},{"abs":0.0007444653420856179,"nu":2197.880000000063},{"abs":0.0007367213035159849,"nu":2197.890000000063},{"abs":0.0007292273232174097,"nu":2197.9000000000633},{"abs":0.0007219767715257404,"nu":2197.9100000000635},{"abs":0.0007149633242923047,"nu":2197.9200000000637},{"abs":0.0007081809521414375,"nu":2197.930000000064},{"abs":0.0007016237965972897,"nu":2197.940000000064},{"abs":0.0006952866201204847,"nu":2197.9500000000644},{"abs":0.0006891641114561832,"nu":2197.9600000000646},{"abs":0.0006832513401004959,"nu":2197.970000000065},{"abs":0.0006775436385979115,"nu":2197.980000000065},{"abs":0.0006720366023487127,"nu":2197.9900000000653},{"abs":0.0006667260926080968,"nu":2198.0000000000655},{"abs":0.000661608243591349,"nu":2198.0100000000657},{"abs":0.0006566794749823079,"nu":2198.020000000066},{"abs":0.0006519365116993968,"nu":2198.030000000066},{"abs":0.0006473764135910963,"nu":2198.0400000000664},{"abs":0.0006429966189458732,"nu":2198.0500000000666},{"abs":0.0006387950075160327,"nu":2198.060000000067},{"abs":0.0006347699914868427,"nu":2198.070000000067},{"abs":0.00063092064694241,"nu":2198.0800000000672},{"abs":0.000627246904559394,"nu":2198.0900000000674},{"abs":0.0006237498273407166,"nu":2198.1000000000677},{"abs":0.0006204320158691059,"nu":2198.110000000068},{"abs":0.0006172981969897336,"nu":2198.120000000068},{"abs":0.0006143560631181855,"nu":2198.1300000000683},{"abs":0.000611617409342884,"nu":2198.1400000000685},{"abs":0.0006090994753273452,"nu":2198.1500000000688},{"abs":0.0006068258777039702,"nu":2198.160000000069},{"abs":0.0006048249432711863,"nu":2198.170000000069},{"abs":0.0006031193415646362,"nu":2198.1800000000694},{"abs":0.0006016945310193165,"nu":2198.1900000000696},{"abs":0.0006004366854195311,"nu":2198.20000000007},{"abs":0.0005990859021381959,"nu":2198.21000000007},{"abs":0.0005973485169988991,"nu":2198.2200000000703},{"abs":0.0005951702429862414,"nu":2198.2300000000705},{"abs":0.0005927965983219681,"nu":2198.2400000000707},{"abs":0.0005905190145424696,"nu":2198.250000000071},{"abs":0.0005884934620200424,"nu":2198.260000000071},{"abs":0.0005867552758867555,"nu":2198.2700000000714},{"abs":0.0005852862757908571,"nu":2198.2800000000716},{"abs":0.0005840558103349108,"nu":2198.290000000072},{"abs":0.0005830360823009948,"nu":2198.300000000072},{"abs":0.0005822055898656854,"nu":2198.3100000000723},{"abs":0.0005815486414873973,"nu":2198.3200000000725},{"abs":0.0005810540291242365,"nu":2198.3300000000727},{"abs":0.0005807138019161242,"nu":2198.340000000073},{"abs":0.0005805223340536128,"nu":2198.350000000073},{"abs":0.0005804756631325503,"nu":2198.3600000000733},{"abs":0.0005805710323950173,"nu":2198.3700000000736},{"abs":0.0005808065764109765,"nu":2198.380000000074},{"abs":0.0005811811051799182,"nu":2198.390000000074},{"abs":0.0005816939554197025,"nu":2198.400000000074},{"abs":0.0005823448879968789,"nu":2198.4100000000744},{"abs":0.0005831340174916476,"nu":2198.4200000000747},{"abs":0.0005840617646387738,"nu":2198.430000000075},{"abs":0.0005851288255872888,"nu":2198.440000000075},{"abs":0.0005863361541140916,"nu":2198.4500000000753},{"abs":0.0005876849544872769,"nu":2198.4600000000755},{"abs":0.0005891766838596064,"nu":2198.4700000000757},{"abs":0.0005908127238585949,"nu":2198.480000000076},{"abs":0.0005925957651663877,"nu":2198.490000000076},{"abs":0.0005945277953595325,"nu":2198.5000000000764},{"abs":0.0005966115143673634,"nu":2198.5100000000766},{"abs":0.000598850062365532,"nu":2198.520000000077},{"abs":0.0006012471172258906,"nu":2198.530000000077},{"abs":0.0006038070303939292,"nu":2198.5400000000773},{"abs":0.0006065350167777738,"nu":2198.5500000000775},{"abs":0.0006094374207504621,"nu":2198.5600000000777},{"abs":0.000612522088468031,"nu":2198.570000000078},{"abs":0.0006157988844790736,"nu":2198.580000000078},{"abs":0.000619280390675666,"nu":2198.5900000000784},{"abs":0.0006229827951769283,"nu":2198.6000000000786},{"abs":0.0006269268538706889,"nu":2198.610000000079},{"abs":0.0006311384234656739,"nu":2198.620000000079},{"abs":0.000635647046766519,"nu":2198.6300000000792},{"abs":0.0006404787793621551,"nu":2198.6400000000795},{"abs":0.0006456357880261193,"nu":2198.6500000000797},{"abs":0.000651055143439614,"nu":2198.66000000008},{"abs":0.0006565618948989964,"nu":2198.67000000008},{"abs":0.0006618922011768179,"nu":2198.6800000000803},{"abs":0.0006668621339004881,"nu":2198.6900000000805},{"abs":0.0006715421292663665,"nu":2198.7000000000808},{"abs":0.0006761923883427616,"nu":2198.710000000081},{"abs":0.000681056225682809,"nu":2198.720000000081},{"abs":0.0006862613179815602,"nu":2198.7300000000814},{"abs":0.0006918434275425274,"nu":2198.7400000000816},{"abs":0.0006977957190551949,"nu":2198.750000000082},{"abs":0.0007040997312547008,"nu":2198.760000000082},{"abs":0.000710738412451233,"nu":2198.7700000000823},{"abs":0.0007176999699991791,"nu":2198.7800000000825},{"abs":0.0007249781506277584,"nu":2198.7900000000827},{"abs":0.000732571339391017,"nu":2198.800000000083},{"abs":0.0007404810237500947,"nu":2198.810000000083},{"abs":0.0007487090965464157,"nu":2198.8200000000834},{"abs":0.0007572533484538361,"nu":2198.8300000000836},{"abs":0.0007661038226301768,"nu":2198.840000000084},{"abs":0.0007752492915605707,"nu":2198.850000000084},{"abs":0.0007846946434540621,"nu":2198.8600000000843},{"abs":0.0007944649944611261,"nu":2198.8700000000845},{"abs":0.0008045892796479768,"nu":2198.8800000000847},{"abs":0.0008150885662870374,"nu":2198.890000000085},{"abs":0.0008259771079181563,"nu":2198.900000000085},{"abs":0.0008372666603119936,"nu":2198.9100000000853},{"abs":0.0008489690643710685,"nu":2198.9200000000856},{"abs":0.0008610971971546084,"nu":2198.930000000086},{"abs":0.0008736651932963376,"nu":2198.940000000086},{"abs":0.00088668843758772,"nu":2198.950000000086},{"abs":0.0009001835173339301,"nu":2198.9600000000864},{"abs":0.0009141681899085787,"nu":2198.9700000000867},{"abs":0.0009286613757376318,"nu":2198.980000000087},{"abs":0.0009436831743945704,"nu":2198.990000000087},{"abs":0.000959254899378677,"nu":2199.0000000000873},{"abs":0.0009753991278447138,"nu":2199.0100000000875},{"abs":0.0009921397626993826,"nu":2199.0200000000877},{"abs":0.0010095021054448733,"nu":2199.030000000088},{"abs":0.0010275129388622607,"nu":2199.040000000088},{"abs":0.0010462006191748628,"nu":2199.0500000000884},{"abs":0.0010655951777233414,"nu":2199.0600000000886},{"abs":0.0010857284324338053,"nu":2199.070000000089},{"abs":0.0011066341095702372,"nu":2199.080000000089},{"abs":0.00112834797644976,"nu":2199.0900000000893},{"abs":0.0011509079859584883,"nu":2199.1000000000895},{"abs":0.0011743544338605164,"nu":2199.1100000000897},{"abs":0.0011987302298278192,"nu":2199.12000000009},{"abs":0.0012240806852847025,"nu":2199.13000000009},{"abs":0.0012838528424731553,"nu":2199.1400000000904},{"abs":0.0013114680142568824,"nu":2199.1500000000906},{"abs":0.0013402140586086446,"nu":2199.160000000091},{"abs":0.0013701495261045353,"nu":2199.170000000091},{"abs":0.0014013368874333048,"nu":2199.1800000000912},{"abs":0.0014338428494146864,"nu":2199.1900000000915},{"abs":0.0014677387012517022,"nu":2199.2000000000917},{"abs":0.0015031006943405068,"nu":2199.210000000092},{"abs":0.001540010459381577,"nu":2199.220000000092},{"abs":0.001578555465014176,"nu":2199.2300000000923},{"abs":0.0016188295227432914,"nu":2199.2400000000926},{"abs":0.0016609333435540176,"nu":2199.2500000000928},{"abs":0.0017049751523260553,"nu":2199.260000000093},{"abs":0.0017510713669861492,"nu":2199.270000000093},{"abs":0.0017993473502862989,"nu":2199.2800000000934},{"abs":0.0018499382431913579,"nu":2199.2900000000936},{"abs":0.0019029898901273745,"nu":2199.300000000094},{"abs":0.0019586598678103455,"nu":2199.310000000094},{"abs":0.0020171186310798295,"nu":2199.3200000000943},{"abs":0.0020785507911468535,"nu":2199.3300000000945},{"abs":0.002143156543979168,"nu":2199.3400000000947},{"abs":0.0022111532692537746,"nu":2199.350000000095},{"abs":0.0022827773234772894,"nu":2199.360000000095},{"abs":0.0023582860546006407,"nu":2199.3700000000954},{"abs":0.002437960069843345,"nu":2199.3800000000956},{"abs":0.002522105793624989,"nu":2199.390000000096},{"abs":0.002611058358639034,"nu":2199.400000000096},{"abs":0.002705184880391639,"nu":2199.4100000000963},{"abs":0.002804888174207912,"nu":2199.4200000000965},{"abs":0.0029106109840750694,"nu":2199.4300000000967},{"abs":0.003022840805113825,"nu":2199.440000000097},{"abs":0.0031421153963998006,"nu":2199.450000000097},{"abs":0.0032690290988615775,"nu":2199.4600000000974},{"abs":0.003404240094769182,"nu":2199.4700000000976},{"abs":0.003548478771780952,"nu":2199.480000000098},{"abs":0.0037025573867576363,"nu":2199.490000000098},{"abs":0.00386738126399116,"nu":2199.500000000098},{"abs":0.004043961810928365,"nu":2199.5100000000984},{"abs":0.0042334316941866745,"nu":2199.5200000000987},{"abs":0.004437062592597021,"nu":2199.530000000099},{"abs":0.004656286035949913,"nu":2199.540000000099},{"abs":0.00489271795296134,"nu":2199.5500000000993},{"abs":0.00514818769608194,"nu":2199.5600000000995},{"abs":0.005424772492474541,"nu":2199.5700000000998},{"abs":0.005724838500727724,"nu":2199.5800000001},{"abs":0.006051089946123756,"nu":2199.5900000001},{"abs":0.0064066281827695115,"nu":2199.6000000001004},{"abs":0.006795023025879731,"nu":2199.6100000001006},{"abs":0.007220399242654702,"nu":2199.620000000101},{"abs":0.007687542147530014,"nu":2199.630000000101},{"abs":0.008202026912218824,"nu":2199.6400000001013},{"abs":0.008770378011753874,"nu":2199.6500000001015},{"abs":0.009400266853283233,"nu":2199.6600000001017},{"abs":0.010100758207088232,"nu":2199.670000000102},{"abs":0.010882619395254152,"nu":2199.680000000102},{"abs":0.0117587107175665,"nu":2199.6900000001024},{"abs":0.012744481745396467,"nu":2199.7000000001026},{"abs":0.013858605454908237,"nu":2199.710000000103},{"abs":0.015123801217912791,"nu":2199.720000000103},{"abs":0.01656789111100978,"nu":2199.7300000001032},{"abs":0.018225193535034875,"nu":2199.7400000001035},{"abs":0.020138350987476315,"nu":2199.7500000001037},{"abs":0.022360753081430047,"nu":2199.760000000104},{"abs":0.024959764843905604,"nu":2199.770000000104},{"abs":0.0280210456687599,"nu":2199.7800000001043},{"abs":0.03165433643164698,"nu":2199.7900000001046},{"abs":0.03600119224008701,"nu":2199.800000000105},{"abs":0.04124520821611158,"nu":2199.810000000105},{"abs":0.04762521707583934,"nu":2199.820000000105},{"abs":0.055451449864847104,"nu":2199.8300000001054},{"abs":0.0651230847211312,"nu":2199.8400000001056},{"abs":0.07714138862066136,"nu":2199.850000000106},{"abs":0.09210270187244188,"nu":2199.860000000106},{"abs":0.11063401093667236,"nu":2199.8700000001063},{"abs":0.13319498285672218,"nu":2199.8800000001065},{"abs":0.15962404418520773,"nu":2199.8900000001067},{"abs":0.18833412550657133,"nu":2199.900000000107},{"abs":0.21539915913943258,"nu":2199.910000000107},{"abs":0.23459495411482031,"nu":2199.9200000001074},{"abs":0.23983794603620667,"nu":2199.9300000001076},{"abs":0.2292107400122612,"nu":2199.940000000108},{"abs":0.2064838170780366,"nu":2199.950000000108},{"abs":0.17823062340600956,"nu":2199.9600000001083},{"abs":0.15000614934335593,"nu":2199.9700000001085},{"abs":0.12484151198940101,"nu":2199.9800000001087},{"abs":0.10371501639689673,"nu":2199.990000000109},{"abs":0.08649800282815298,"nu":2200.000000000109},{"abs":0.07263678678199043,"nu":2200.0100000001094},{"abs":0.06150158225438282,"nu":2200.0200000001096},{"abs":0.05252601716235241,"nu":2200.03000000011},{"abs":0.04524523589400231,"nu":2200.04000000011},{"abs":0.03929305845693578,"nu":2200.0500000001102},{"abs":0.034386187883991205,"nu":2200.0600000001104},{"abs":0.030306788625011172,"nu":2200.0700000001107},{"abs":0.02688729580002276,"nu":2200.080000000111},{"abs":0.023998293890318812,"nu":2200.090000000111},{"abs":0.021539224950195585,"nu":2200.1000000001113},{"abs":0.019431395736960972,"nu":2200.1100000001115},{"abs":0.017612752843195273,"nu":2200.1200000001118},{"abs":0.016033982717921974,"nu":2200.130000000112},{"abs":0.014655593009826417,"nu":2200.140000000112},{"abs":0.013445717951816892,"nu":2200.1500000001124},{"abs":0.012378458303630024,"nu":2200.1600000001126},{"abs":0.011432617277963367,"nu":2200.170000000113},{"abs":0.010590731259113462,"nu":2200.180000000113},{"abs":0.009838321287431971,"nu":2200.1900000001133},{"abs":0.0091633109428502,"nu":2200.2000000001135},{"abs":0.008555570480183064,"nu":2200.2100000001137},{"abs":0.008006557347943099,"nu":2200.220000000114},{"abs":0.0075090306035674155,"nu":2200.230000000114},{"abs":0.007056821902531498,"nu":2200.2400000001144},{"abs":0.006644649191054915,"nu":2200.2500000001146},{"abs":0.006267961995956496,"nu":2200.260000000115},{"abs":0.005922812462499123,"nu":2200.270000000115},{"abs":0.00560575820703655,"nu":2200.2800000001153},{"abs":0.005313805702157228,"nu":2200.2900000001155},{"abs":0.005044379301028866,"nu":2200.3000000001157},{"abs":0.004795260475292141,"nu":2200.310000000116},{"abs":0.004564506589495082,"nu":2200.320000000116},{"abs":0.004350390866075707,"nu":2200.3300000001163},{"abs":0.004151371878474093,"nu":2200.3400000001166},{"abs":0.003966074874047205,"nu":2200.350000000117},{"abs":0.003793274578582725,"nu":2200.360000000117},{"abs":0.0036318781406079505,"nu":2200.370000000117},{"abs":0.0034809091533466725,"nu":2200.3800000001174},{"abs":0.0033394933693597657,"nu":2200.3900000001177},{"abs":0.0032068462237517456,"nu":2200.400000000118},{"abs":0.0030822620352750005,"nu":2200.410000000118},{"abs":0.002965104612796571,"nu":2200.4200000001183},{"abs":0.0028547994516642623,"nu":2200.4300000001185},{"abs":0.0027508263471290022,"nu":2200.4400000001187},{"abs":0.002652713580216141,"nu":2200.450000000119},{"abs":0.00256003255422778,"nu":2200.460000000119},{"abs":0.0024723931645035543,"nu":2200.4700000001194},{"abs":0.0023894397411483802,"nu":2200.4800000001196},{"abs":0.002310847485502809,"nu":2200.49000000012},{"abs":0.002236319333692025,"nu":2200.50000000012},{"abs":0.0021655831910810546,"nu":2200.5100000001203},{"abs":0.00209838949032623,"nu":2200.5200000001205},{"abs":0.0020345090333250323,"nu":2200.5300000001207},{"abs":0.001973731084071349,"nu":2200.540000000121},{"abs":0.0019158616855598058,"nu":2200.550000000121},{"abs":0.0018607221798174504,"nu":2200.5600000001214},{"abs":0.0018081479163110788,"nu":2200.5700000001216},{"abs":0.00175798714092583,"nu":2200.580000000122},{"abs":0.0017101000660753429,"nu":2200.590000000122},{"abs":0.0016643581328145524,"nu":2200.6000000001222},{"abs":0.001620643487620958,"nu":2200.6100000001225},{"abs":0.0015788487052880089,"nu":2200.6200000001227},{"abs":0.0015388767770281124,"nu":2200.630000000123},{"abs":0.0015006412894372596,"nu":2200.640000000123},{"abs":0.001464066367609607,"nu":2200.6500000001233},{"abs":0.0014290848854474497,"nu":2200.6600000001235},{"abs":0.0013956308091433698,"nu":2200.6700000001238},{"abs":0.0013102436051597572,"nu":2200.680000000124},{"abs":0.00127978819499965,"nu":2200.690000000124},{"abs":0.0012503930124701376,"nu":2200.7000000001244},{"abs":0.0012218299708911052,"nu":2200.7100000001246},{"abs":0.001194040095881569,"nu":2200.720000000125},{"abs":0.0011671351497480349,"nu":2200.730000000125},{"abs":0.0011412315366075593,"nu":2200.7400000001253},{"abs":0.0011163608329528474,"nu":2200.7500000001255},{"abs":0.0010924911495265156,"nu":2200.7600000001257},{"abs":0.0010695668932152271,"nu":2200.770000000126},{"abs":0.001047530139326246,"nu":2200.780000000126},{"abs":0.001026327779674223,"nu":2200.7900000001264},{"abs":0.0010059126708601533,"nu":2200.8000000001266},{"abs":0.0009862429673186263,"nu":2200.810000000127},{"abs":0.0009672811550200501,"nu":2200.820000000127},{"abs":0.0009489932134887273,"nu":2200.8300000001273},{"abs":0.0009313479738239277,"nu":2200.8400000001275},{"abs":0.0009143166436419281,"nu":2200.8500000001277},{"abs":0.000897872455544403,"nu":2200.860000000128},{"abs":0.0008819904028016059,"nu":2200.870000000128},{"abs":0.0008666470359079757,"nu":2200.8800000001283},{"abs":0.0008518203018571374,"nu":2200.8900000001286},{"abs":0.0008374894138390973,"nu":2200.900000000129},{"abs":0.0008236347430373649,"nu":2200.910000000129},{"abs":0.0008102377268511184,"nu":2200.920000000129},{"abs":0.0007972807896240049,"nu":2200.9300000001294},{"abs":0.0007847472731328534,"nu":2200.9400000001297},{"abs":0.0007726213748763194,"nu":2200.95000000013},{"abs":0.000760888092728258,"nu":2200.96000000013},{"abs":0.0007495331748858797,"nu":2200.9700000001303},{"abs":0.0007385430743159625,"nu":2200.9800000001305},{"abs":0.0007279049070881162,"nu":2200.9900000001307},{"abs":0.0007176064141070456,"nu":2201.000000000131},{"abs":0.0007076359258534027,"nu":2201.010000000131},{"abs":0.0006979823298211466,"nu":2201.0200000001314},{"abs":0.0006886350403999671,"nu":2201.0300000001316},{"abs":0.0006795839710004153,"nu":2201.040000000132},{"abs":0.0006708195082624847,"nu":2201.050000000132},{"abs":0.0006623324882291362,"nu":2201.0600000001323},{"abs":0.0006541141744096316,"nu":2201.0700000001325},{"abs":0.0006461562377047218,"nu":2201.0800000001327},{"abs":0.0006384507382298523,"nu":2201.090000000133},{"abs":0.0006309901091527524,"nu":2201.100000000133},{"abs":0.0006237671427794053,"nu":2201.1100000001334},{"abs":0.0006167749792921154,"nu":2201.1200000001336},{"abs":0.0006100070987924271,"nu":2201.130000000134},{"abs":0.000603457317663902,"nu":2201.140000000134},{"abs":0.0005971197907687113,"nu":2201.1500000001342},{"abs":0.0005909890215835234,"nu":2201.1600000001345},{"abs":0.0005850598827461391,"nu":2201.1700000001347},{"abs":0.000579327648394707,"nu":2201.180000000135},{"abs":0.0005737880331267125,"nu":2201.190000000135},{"abs":0.000568437208650437,"nu":2201.2000000001353},{"abs":0.0005632716986495261,"nu":2201.2100000001356},{"abs":0.0005582878842018054,"nu":2201.2200000001358},{"abs":0.0005534806209727958,"nu":2201.230000000136},{"abs":0.0005488408341147086,"nu":2201.240000000136},{"abs":0.000544354646421153,"nu":2201.2500000001364},{"abs":0.0005400094274110274,"nu":2201.2600000001366},{"abs":0.0005358032013905768,"nu":2201.270000000137},{"abs":0.0005317430906992546,"nu":2201.280000000137},{"abs":0.000527835452279393,"nu":2201.2900000001373},{"abs":0.0005240816176786044,"nu":2201.3000000001375},{"abs":0.0005204795530410861,"nu":2201.3100000001377},{"abs":0.0005170261264838321,"nu":2201.320000000138},{"abs":0.0005137182675317066,"nu":2201.330000000138},{"abs":0.0005105533672150175,"nu":2201.3400000001384},{"abs":0.000507529381184233,"nu":2201.3500000001386},{"abs":0.0005046448620864321,"nu":2201.360000000139},{"abs":0.0005018990071298796,"nu":2201.370000000139},{"abs":0.000499291753911968,"nu":2201.3800000001393},{"abs":0.0004968239442111181,"nu":2201.3900000001395},{"abs":0.0004944975766903012,"nu":2201.4000000001397},{"abs":0.0004923159447319914,"nu":2201.41000000014},{"abs":0.0004902850608259942,"nu":2201.42000000014},{"abs":0.0004884129148623424,"nu":2201.4300000001404},{"abs":0.00048671104437718137,"nu":2201.4400000001406},{"abs":0.0004851944948976816,"nu":2201.450000000141},{"abs":0.00048388017912053124,"nu":2201.460000000141},{"abs":0.00048278008856164384,"nu":2201.470000000141},{"abs":0.00048188341750503934,"nu":2201.4800000001414},{"abs":0.0004811240080737574,"nu":2201.4900000001417},{"abs":0.0004803536546574618,"nu":2201.500000000142},{"abs":0.00047938621354417507,"nu":2201.510000000142},{"abs":0.00047813691389576656,"nu":2201.5200000001423},{"abs":0.00047670516186964807,"nu":2201.5300000001425},{"abs":0.00047527730334886005,"nu":2201.5400000001428},{"abs":0.0004739926349758192,"nu":2201.550000000143},{"abs":0.00047290926389716994,"nu":2201.560000000143},{"abs":0.0004720331154358202,"nu":2201.5700000001434},{"abs":0.0004713500137669477,"nu":2201.5800000001436},{"abs":0.0004708417533806607,"nu":2201.590000000144},{"abs":0.00047049228415962387,"nu":2201.600000000144},{"abs":0.0004702890693865588,"nu":2201.6100000001443},{"abs":0.0004702228067936971,"nu":2201.6200000001445},{"abs":0.0004702867616143908,"nu":2201.6300000001447},{"abs":0.00047047612980805504,"nu":2201.640000000145},{"abs":0.000470787534073019,"nu":2201.650000000145},{"abs":0.0004712186518473522,"nu":2201.6600000001454},{"abs":0.00047176794847449057,"nu":2201.6700000001456},{"abs":0.0004724344877680688,"nu":2201.680000000146},{"abs":0.00047321779771281085,"nu":2201.690000000146},{"abs":0.0004741177749722021,"nu":2201.7000000001462},{"abs":0.00047513461666630883,"nu":2201.7100000001465},{"abs":0.00047626877139261234,"nu":2201.7200000001467},{"abs":0.00047752090392810706,"nu":2201.730000000147},{"abs":0.0004788918697525642,"nu":2201.740000000147},{"abs":0.00048038269670055175,"nu":2201.7500000001473},{"abs":0.0004819945718515628,"nu":2201.7600000001476},{"abs":0.0004837288323205367,"nu":2201.770000000148},{"abs":0.00048558695899513133,"nu":2201.780000000148},{"abs":0.00048757057253434133,"nu":2201.790000000148},{"abs":0.0004896814311329946,"nu":2201.8000000001484},{"abs":0.0004919214296913541,"nu":2201.8100000001486},{"abs":0.0004942926001262028,"nu":2201.820000000149},{"abs":0.0004967971126304467,"nu":2201.830000000149},{"abs":0.0004994372777395148,"nu":2201.8400000001493},{"abs":0.000502215549101577,"nu":2201.8500000001495},{"abs":0.000505134526877127,"nu":2201.8600000001497},{"abs":0.0005081969617152508,"nu":2201.87000000015},{"abs":0.0005114057592706404,"nu":2201.88000000015},{"abs":0.0005147639852386507,"nu":2201.8900000001504},{"abs":0.000518274870895965,"nu":2201.9000000001506},{"abs":0.0005219418191429482,"nu":2201.910000000151},{"abs":0.0005257684110505277,"nu":2201.920000000151},{"abs":0.0005297584765883917,"nu":2201.9300000001513},{"abs":0.0005339158540878582,"nu":2201.9400000001515},{"abs":0.0005382447545537636,"nu":2201.9500000001517},{"abs":0.0005427495539163194,"nu":2201.960000000152},{"abs":0.0005474348408686282,"nu":2201.970000000152},{"abs":0.0005523054329911258,"nu":2201.9800000001524},{"abs":0.0005573663873421636,"nu":2201.9900000001526},{"abs":0.0005626230117499089,"nu":2202.000000000153},{"abs":0.0005680808768483886,"nu":2202.010000000153},{"abs":0.0005737458289047558,"nu":2202.0200000001532},{"abs":0.0005796240034893939,"nu":2202.0300000001534},{"abs":0.000585721840045211,"nu":2202.0400000001537},{"abs":0.0005920460974173472,"nu":2202.050000000154},{"abs":0.0005986038704102387,"nu":2202.060000000154},{"abs":0.0006054026074445137,"nu":2202.0700000001543},{"abs":0.0006124501293928907,"nu":2202.0800000001545},{"abs":0.0006197546496808156,"nu":2202.0900000001548},{"abs":0.0006273247957453132,"nu":2202.100000000155},{"abs":0.0006351696319536153,"nu":2202.110000000155},{"abs":0.0006432986840919869,"nu":2202.1200000001554},{"abs":0.0006517219655452626,"nu":2202.1300000001556},{"abs":0.0006604500052978901,"nu":2202.140000000156},{"abs":0.000669493877899373,"nu":2202.150000000156},{"abs":0.0006788652355498555,"nu":2202.1600000001563},{"abs":0.0006885763424757228,"nu":2202.1700000001565},{"abs":0.0006986401117807494,"nu":2202.1800000001567},{"abs":0.0007090701449757728,"nu":2202.190000000157},{"abs":0.0007198807744084699,"nu":2202.200000000157},{"abs":0.000731087108836404,"nu":2202.2100000001574},{"abs":0.0007427050824091691,"nu":2202.2200000001576},{"abs":0.0007547508810373936,"nu":2202.230000000158},{"abs":0.0007672435074632171,"nu":2202.240000000158},{"abs":0.0007802010751023458,"nu":2202.2500000001583},{"abs":0.00079364338851271,"nu":2202.2600000001585},{"abs":0.0008075913849720404,"nu":2202.2700000001587},{"abs":0.0008220672111574885,"nu":2202.280000000159},{"abs":0.0008370943060011533,"nu":2202.290000000159},{"abs":0.0008526974902864572,"nu":2202.3000000001593},{"abs":0.0008689030636267565,"nu":2202.3100000001596},{"abs":0.0008857389095187957,"nu":2202.32000000016},{"abs":0.0009032346092485868,"nu":2202.33000000016},{"abs":0.0009471256953852712,"nu":2202.34000000016},{"abs":0.0009661659040756706,"nu":2202.3500000001604},{"abs":0.000985967155796226,"nu":2202.3600000001607},{"abs":0.0010065671809994863,"nu":2202.370000000161},{"abs":0.001028006144037079,"nu":2202.380000000161},{"abs":0.0010503268320084839,"nu":2202.3900000001613},{"abs":0.001073574860950376,"nu":2202.4000000001615},{"abs":0.001097798901205401,"nu":2202.4100000001617},{"abs":0.0011230509240313285,"nu":2202.420000000162},{"abs":0.001149386471763782,"nu":2202.430000000162},{"abs":0.001176864954132164,"nu":2202.4400000001624},{"abs":0.0012055499736556281,"nu":2202.4500000001626},{"abs":0.001235509683418484,"nu":2202.460000000163},{"abs":0.0012668171809510221,"nu":2202.470000000163},{"abs":0.0012995509424302697,"nu":2202.4800000001633},{"abs":0.0013337953019748826,"nu":2202.4900000001635},{"abs":0.0013696409814535767,"nu":2202.5000000001637},{"abs":0.001407185676967558,"nu":2202.510000000164},{"abs":0.0014465347090242592,"nu":2202.520000000164},{"abs":0.0014878017444097734,"nu":2202.5300000001644},{"abs":0.001531109598915025,"nu":2202.5400000001646},{"abs":0.0015765911314034311,"nu":2202.550000000165},{"abs":0.0016243902412590207,"nu":2202.560000000165},{"abs":0.0016746629830636864,"nu":2202.5700000001652},{"abs":0.0017275788144680546,"nu":2202.5800000001655},{"abs":0.0017833219957009404,"nu":2202.5900000001657},{"abs":0.0018420931620763243,"nu":2202.600000000166},{"abs":0.0019041110942906057,"nu":2202.610000000166},{"abs":0.001969614715357581,"nu":2202.6200000001663},{"abs":0.0020388653478320643,"nu":2202.6300000001665},{"abs":0.002112149270677132,"nu":2202.6400000001668},{"abs":0.0021897806219256053,"nu":2202.650000000167},{"abs":0.0022721047014039285,"nu":2202.660000000167},{"abs":0.002359501737515664,"nu":2202.6700000001674},{"abs":0.0024523911937784555,"nu":2202.6800000001676},{"abs":0.0025512367049166356,"nu":2202.690000000168},{"abs":0.0026565508736614953,"nu":2202.700000000168},{"abs":0.0027689053145743114,"nu":2202.7100000001683},{"abs":0.0028889329401629933,"nu":2202.7200000001685},{"abs":0.003017340231201575,"nu":2202.7300000001687},{"abs":0.0031549165335909408,"nu":2202.740000000169},{"abs":0.003302545926679497,"nu":2202.750000000169},{"abs":0.0034612211097273964,"nu":2202.7600000001694},{"abs":0.003632059705526668,"nu":2202.7700000001696},{"abs":0.003816323470445403,"nu":2202.78000000017},{"abs":0.004015441013470535,"nu":2202.79000000017},{"abs":0.004231034769770267,"nu":2202.8000000001703},{"abs":0.004464953155530216,"nu":2202.8100000001705},{"abs":0.004719309061776255,"nu":2202.8200000001707},{"abs":0.0049965261408169825,"nu":2202.830000000171},{"abs":0.005299394720201446,"nu":2202.840000000171},{"abs":0.005631139673111874,"nu":2202.8500000001713},{"abs":0.005995503180556052,"nu":2202.8600000001716},{"abs":0.006396846427731161,"nu":2202.870000000172},{"abs":0.006840274602903874,"nu":2202.880000000172},{"abs":0.007331792361517083,"nu":2202.890000000172},{"abs":0.007878497580095706,"nu":2202.9000000001724},{"abs":0.008488824674571183,"nu":2202.9100000001727},{"abs":0.009172852095369525,"nu":2202.920000000173},{"abs":0.009942693555160228,"nu":2202.930000000173},{"abs":0.010812999267792209,"nu":2202.9400000001733},{"abs":0.011801602737764995,"nu":2202.9500000001735},{"abs":0.01293036145123257,"nu":2202.9600000001737},{"abs":0.014226257589687062,"nu":2202.970000000174},{"abs":0.015722849534238244,"nu":2202.980000000174},{"abs":0.017462198964243666,"nu":2202.9900000001744},{"abs":0.01949744481079513,"nu":2203.0000000001746},{"abs":0.021896257183123657,"nu":2203.010000000175},{"abs":0.02474548265725679,"nu":2203.020000000175},{"abs":0.028157380722551466,"nu":2203.0300000001753},{"abs":0.03227792272027088,"nu":2203.0400000001755},{"abs":0.03729759540212416,"nu":2203.0500000001757},{"abs":0.04346481395665523,"nu":2203.060000000176},{"abs":0.051100853190021285,"nu":2203.070000000176},{"abs":0.06061194944032705,"nu":2203.0800000001764},{"abs":0.07248624698056112,"nu":2203.0900000001766},{"abs":0.08724575522733215,"nu":2203.100000000177},{"abs":0.10529079177592159,"nu":2203.110000000177},{"abs":0.1265330183175269,"nu":2203.1200000001772},{"abs":0.149728809291,"nu":2203.1300000001775},{"abs":0.1716968360773956,"nu":2203.1400000001777},{"abs":0.18730873208145396,"nu":2203.150000000178},{"abs":0.1915114565131737,"nu":2203.160000000178},{"abs":0.18273237671629408,"nu":2203.1700000001783},{"abs":0.16415258051523163,"nu":2203.1800000001786},{"abs":0.14122902049137687,"nu":2203.1900000001788},{"abs":0.1184905266358021,"nu":2203.200000000179},{"abs":0.0983438576122217,"nu":2203.210000000179},{"abs":0.08151846592634712,"nu":2203.2200000001794},{"abs":0.0678644892879235,"nu":2203.2300000001796},{"abs":0.056908694512799736,"nu":2203.24000000018},{"abs":0.048130865372805275,"nu":2203.25000000018},{"abs":0.04107035197852008,"nu":2203.2600000001803},{"abs":0.03535262784564213,"nu":2203.2700000001805},{"abs":0.030684584821248865,"nu":2203.2800000001807},{"abs":0.02684054216249121,"nu":2203.290000000181},{"abs":0.02364760128533381,"nu":2203.300000000181},{"abs":0.020973145647392385,"nu":2203.3100000001814},{"abs":0.018714986875327563,"nu":2203.3200000001816},{"abs":0.01679387155835929,"nu":2203.330000000182},{"abs":0.015147874409251331,"nu":2203.340000000182},{"abs":0.01372822723863522,"nu":2203.3500000001823},{"abs":0.012496216214711088,"nu":2203.3600000001825},{"abs":0.011420866208460497,"nu":2203.3700000001827},{"abs":0.010477203499564597,"nu":2203.380000000183},{"abs":0.009644944094907038,"nu":2203.390000000183},{"abs":0.0089074964874112,"nu":2203.4000000001834},{"abs":0.008251197980158949,"nu":2203.4100000001836},{"abs":0.007664725591326459,"nu":2203.420000000184},{"abs":0.007138638332037146,"nu":2203.430000000184},{"abs":0.006665019031587311,"nu":2203.440000000184},{"abs":0.006237192123634132,"nu":2203.4500000001844},{"abs":0.005849499798814387,"nu":2203.4600000001847},{"abs":0.0054971233110114376,"nu":2203.470000000185},{"abs":0.0051759394482070765,"nu":2203.480000000185},{"abs":0.004882404565648794,"nu":2203.4900000001853},{"abs":0.004613460357660717,"nu":2203.5000000001855},{"abs":0.0043664568784398065,"nu":2203.5100000001858},{"abs":0.004139089329213728,"nu":2203.520000000186},{"abs":0.003929345894164597,"nu":2203.530000000186},{"abs":0.003735464492149338,"nu":2203.5400000001864},{"abs":0.0035558967599770746,"nu":2203.5500000001866},{"abs":0.00338927792683571,"nu":2203.560000000187},{"abs":0.003234401496462197,"nu":2203.570000000187},{"abs":0.003090197825689984,"nu":2203.5800000001873},{"abs":0.0029557157608054844,"nu":2203.5900000001875},{"abs":0.0028301064978992966,"nu":2203.6000000001877},{"abs":0.002712609147997225,"nu":2203.610000000188},{"abs":0.002602539070453539,"nu":2203.620000000188},{"abs":0.002499281626576554,"nu":2203.6300000001884},{"abs":0.002402289032330031,"nu":2203.6400000001886},{"abs":0.002311072238363489,"nu":2203.650000000189},{"abs":0.0022251892947918045,"nu":2203.660000000189},{"abs":0.002144237669277979,"nu":2203.6700000001892},{"abs":0.0020678504781830084,"nu":2203.6800000001895},{"abs":0.0019956936181271517,"nu":2203.6900000001897},{"abs":0.0019274627934801588,"nu":2203.70000000019},{"abs":0.0018628805638462604,"nu":2203.71000000019},{"abs":0.0018016936019446146,"nu":2203.7200000001903},{"abs":0.0017436702306422652,"nu":2203.7300000001906},{"abs":0.0016885982376811696,"nu":2203.740000000191},{"abs":0.0016362829423488983,"nu":2203.750000000191},{"abs":0.0015865454837885526,"nu":2203.760000000191},{"abs":0.0015392213025936618,"nu":2203.7700000001914},{"abs":0.0014941587908440363,"nu":2203.7800000001916},{"abs":0.0014512180892300036,"nu":2203.790000000192},{"abs":0.0014102700129759145,"nu":2203.800000000192},{"abs":0.0013711950908670328,"nu":2203.8100000001923},{"abs":0.0013338827038607442,"nu":2203.8200000001925},{"abs":0.0012982303115937623,"nu":2203.8300000001927},{"abs":0.0012641427566449396,"nu":2203.840000000193},{"abs":0.0012315316377277084,"nu":2203.850000000193},{"abs":0.001200314744108823,"nu":2203.8600000001934},{"abs":0.0011704155445125413,"nu":2203.8700000001936},{"abs":0.0011417627245983789,"nu":2203.880000000194},{"abs":0.0011142897678158854,"nu":2203.890000000194},{"abs":0.0010879345750604936,"nu":2203.9000000001943},{"abs":0.0010626391190931652,"nu":2203.9100000001945},{"abs":0.0010383491301555702,"nu":2203.9200000001947},{"abs":0.0010150138096231263,"nu":2203.930000000195},{"abs":0.0009495377384327222,"nu":2203.940000000195},{"abs":0.0009281857317959577,"nu":2203.9500000001954},{"abs":0.0009076527366579432,"nu":2203.9600000001956},{"abs":0.000887899460289185,"nu":2203.970000000196},{"abs":0.0008688889820271366,"nu":2203.980000000196},{"abs":0.000850586586187337,"nu":2203.9900000001962},{"abs":0.0008329596088865014,"nu":2204.0000000001965},{"abs":0.0008159772975570892,"nu":2204.0100000001967},{"abs":0.0007996106820766631,"nu":2204.020000000197},{"abs":0.0007838324565697817,"nu":2204.030000000197},{"abs":0.0007686168710676908,"nu":2204.0400000001973},{"abs":0.00075393963233715,"nu":2204.0500000001975},{"abs":0.0007397778133186214,"nu":2204.0600000001978},{"abs":0.0007261097707527115,"nu":2204.070000000198},{"abs":0.0007129150707308146,"nu":2204.080000000198},{"abs":0.0007001744220948241,"nu":2204.0900000001984},{"abs":0.00068786961784805,"nu":2204.1000000001986},{"abs":0.0006759834850532232,"nu":2204.110000000199},{"abs":0.0006644998441213627,"nu":2204.120000000199},{"abs":0.0006534034789958871,"nu":2204.1300000001993},{"abs":0.0006426801205942265,"nu":2204.1400000001995},{"abs":0.0006323164471084545,"nu":2204.1500000001997},{"abs":0.0006223001065569423,"nu":2204.1600000002},{"abs":0.0006126197695348804,"nu":2204.1700000002},{"abs":0.0006032652236266057,"nu":2204.1800000002004},{"abs":0.0005942275253516916,"nu":2204.1900000002006},{"abs":0.000585499229735707,"nu":2204.200000000201},{"abs":0.0005770747172902043,"nu":2204.210000000201},{"abs":0.0005689506196059257,"nu":2204.2200000002013},{"abs":0.0005611262686172403,"nu":2204.2300000002015},{"abs":0.0005536038581603344,"nu":2204.2400000002017},{"abs":0.000546387376451889,"nu":2204.250000000202},{"abs":0.0005394779781443465,"nu":2204.260000000202},{"abs":0.0005328615086085982,"nu":2204.2700000002023},{"abs":0.0005264854185248375,"nu":2204.2800000002026},{"abs":0.0005202398142611418,"nu":2204.290000000203},{"abs":0.0005139897495587008,"nu":2204.300000000203},{"abs":0.0005076755139157014,"nu":2204.310000000203},{"abs":0.0005013657970778447,"nu":2204.3200000002034},{"abs":0.0004951842881076391,"nu":2204.3300000002037},{"abs":0.0004892175650971335,"nu":2204.340000000204},{"abs":0.0004834961336860478,"nu":2204.350000000204},{"abs":0.00047801682699122485,"nu":2204.3600000002043},{"abs":0.00047276414326488984,"nu":2204.3700000002045},{"abs":0.00046772086123263905,"nu":2204.3800000002047},{"abs":0.00046287170554475793,"nu":2204.390000000205},{"abs":0.0004582040307811381,"nu":2204.400000000205},{"abs":0.0004537075273378067,"nu":2204.4100000002054},{"abs":0.00044937372743843407,"nu":2204.4200000002056},{"abs":0.00044519555818004825,"nu":2204.430000000206},{"abs":0.00044116699450427163,"nu":2204.440000000206},{"abs":0.0004372828046230277,"nu":2204.4500000002063},{"abs":0.00043353836708785856,"nu":2204.4600000002065},{"abs":0.00042992953983356203,"nu":2204.4700000002067},{"abs":0.000426452565944519,"nu":2204.480000000207},{"abs":0.00042310400515044224,"nu":2204.490000000207},{"abs":0.00041988068336525026,"nu":2204.5000000002074},{"abs":0.00041677965495584985,"nu":2204.5100000002076},{"abs":0.00041379817407376967,"nu":2204.520000000208},{"abs":0.000410933672509897,"nu":2204.530000000208},{"abs":0.00040818374230128,"nu":2204.5400000002082},{"abs":0.00040554612184461546,"nu":2204.5500000002085},{"abs":0.0004030186846324437,"nu":2204.5600000002087},{"abs":0.00040059942997827425,"nu":2204.570000000209},{"abs":0.0003982864752717843,"nu":2204.580000000209},{"abs":0.00039607804942798337,"nu":2204.5900000002093},{"abs":0.0003939724872823257,"nu":2204.6000000002095},{"abs":0.0003919682247461279,"nu":2204.6100000002098},{"abs":0.000390063794582443,"nu":2204.62000000021},{"abs":0.0003882578226958944,"nu":2204.63000000021},{"abs":0.000386549024854254,"nu":2204.6400000002104},{"abs":0.0003849362037783553,"nu":2204.6500000002106},{"abs":0.000383418246549976,"nu":2204.660000000211},{"abs":0.00038199412229842765,"nu":2204.670000000211},{"abs":0.0003806628801348843,"nu":2204.6800000002113},{"abs":0.0003794236473105425,"nu":2204.6900000002115},{"abs":0.000378275627577839,"nu":2204.7000000002117},{"abs":0.00037721809973590597,"nu":2204.710000000212},{"abs":0.00037625005820357874,"nu":2204.720000000212},{"abs":0.0003753716462274058,"nu":2204.7300000002124},{"abs":0.00037458200073224113,"nu":2204.7400000002126},{"abs":0.0003738806894068163,"nu":2204.750000000213},{"abs":0.000373267350084268,"nu":2204.760000000213},{"abs":0.00037274169018470247,"nu":2204.7700000002133},{"abs":0.00037230348628618254,"nu":2204.7800000002135},{"abs":0.00037195258382131057,"nu":2204.7900000002137},{"abs":0.00037168889689684754,"nu":2204.800000000214},{"abs":0.00037151240823460514,"nu":2204.810000000214},{"abs":0.00037142316923249305,"nu":2204.8200000002143},{"abs":0.00037142130014499293,"nu":2204.8300000002146},{"abs":0.0003715069903828819,"nu":2204.840000000215},{"abs":0.0003716804989327798,"nu":2204.850000000215},{"abs":0.00037194215489699724,"nu":2204.860000000215},{"abs":0.0003722923581552223,"nu":2204.8700000002154},{"abs":0.000372731580149583,"nu":2204.8800000002157},{"abs":0.00037326036479518515,"nu":2204.890000000216},{"abs":0.00037387932951877444,"nu":2204.900000000216},{"abs":0.00037458916642845927,"nu":2204.9100000002163},{"abs":0.0003753906436178285,"nu":2204.9200000002165},{"abs":0.00037628460660852107,"nu":2204.9300000002168},{"abs":0.0003772719799354272,"nu":2204.940000000217},{"abs":0.00037835376887942795,"nu":2204.950000000217},{"abs":0.0003795310613529524,"nu":2204.9600000002174},{"abs":0.00038080502994436915,"nu":2204.9700000002176},{"abs":0.0003821769341272566,"nu":2204.980000000218},{"abs":0.00038364812264200213,"nu":2204.990000000218}]}</textarea><textarea name="conditions">CO/x=0.0001/T=300K/P=1atm/L=100cm</textarea></form></div>
+            </div>
+        </div>
+
+        <div class="row col-xs-12">
+            <div class="col-xs-4 col-xs-offset-1 text-left">
+                <input type="checkbox" name="fixY" id="fixY"> Fix Y max &nbsp; <input type="text" value="1" size="4" name="fixYval" id="fixYval">
+            </div>
+            <div class="col-xs-2 col-xs-offset-4">
+                <button class="btn btn-primary" id="save_as_png" style="width:170px;">Save to PNG</button>
+            </div>
+        </div>
+
+
+
+        <div class="row col-xs-12">
+            <div class="col-lg-8"><!--This is where the chart goes-->
+                <div id="chart"><svg width="900" height="500" id="plot"><defs><clipPath id="clip"><rect width="780" height="290"></rect></clipPath></defs><defs><marker id="arrowhead" refX="1.5" refY="3.5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L8,3.5 L0,7" fill="none" stroke="black"></path></marker></defs><g class="focus" transform="translate(90,60)"><g class="x axis" transform="translate(0,290)" font-size="13px" font-family="sans-serif"><g class="tick major" transform="translate(16.171171145632208,0)" style="opacity: 1;"><line y2="6" x2="0"></line><text y="9" x="0" dy=".71em" style="text-anchor: middle;">2201</text></g><g class="tick major" transform="translate(113.768768741095,0)" style="opacity: 1;"><line y2="6" x2="0"></line><text y="9" x="0" dy=".71em" style="text-anchor: middle;">2201.5</text></g><g class="tick major" transform="translate(211.36636633655783,0)" style="opacity: 1;"><line y2="6" x2="0"></line><text y="9" x="0" dy=".71em" style="text-anchor: middle;">2202</text></g><g class="tick major" transform="translate(308.96396393202065,0)" style="opacity: 1;"><line y2="6" x2="0"></line><text y="9" x="0" dy=".71em" style="text-anchor: middle;">2202.5</text></g><g class="tick major" transform="translate(406.56156152748343,0)" style="opacity: 1;"><line y2="6" x2="0"></line><text y="9" x="0" dy=".71em" style="text-anchor: middle;">2203</text></g><g class="tick major" transform="translate(504.1591591229463,0)" style="opacity: 1;"><line y2="6" x2="0"></line><text y="9" x="0" dy=".71em" style="text-anchor: middle;">2203.5</text></g><g class="tick major" transform="translate(601.7567567184091,0)" style="opacity: 1;"><line y2="6" x2="0"></line><text y="9" x="0" dy=".71em" style="text-anchor: middle;">2204</text></g><g class="tick major" transform="translate(699.3543543138719,0)" style="opacity: 1;"><line y2="6" x2="0"></line><text y="9" x="0" dy=".71em" style="text-anchor: middle;">2204.5</text></g><path class="domain" d="M0,6V0H780V6"></path></g><g class="x axis" transform="translate(0,0)" font-size="13px" font-family="sans-serif"><g class="tick major" transform="translate(16.171171145599168,0)" style="opacity: 1;"><line y2="-6" x2="0"></line><text y="-9" x="0" dy="0em" style="text-anchor: middle;">4.5433894</text></g><g class="tick major" transform="translate(211.36636633651565,0)" style="opacity: 1;"><line y2="-6" x2="0"></line><text y="-9" x="0" dy="0em" style="text-anchor: middle;">4.5413261</text></g><g class="tick major" transform="translate(406.56156152748633,0)" style="opacity: 1;"><line y2="-6" x2="0"></line><text y="-9" x="0" dy="0em" style="text-anchor: middle;">4.5392646</text></g><g class="tick major" transform="translate(601.7567567184029,0)" style="opacity: 1;"><line y2="-6" x2="0"></line><text y="-9" x="0" dy="0em" style="text-anchor: middle;">4.5372051</text></g><path class="domain" d="M0,-6V0H780V-6"></path></g><g class="y axis" font-size="13px" font-family="sans-serif"><g class="tick major" transform="translate(0,290)" style="opacity: 1;"><line x2="-6" y2="0"></line><text x="-9" y="0" dy=".32em" style="text-anchor: end;">0.00e+0</text></g><g class="tick major" transform="translate(0,195.12414451559465)" style="opacity: 1;"><line x2="-6" y2="0"></line><text x="-9" y="0" dy=".32em" style="text-anchor: end;">1.00e-1</text></g><g class="tick major" transform="translate(0,100.24828903118933)" style="opacity: 1;"><line x2="-6" y2="0"></line><text x="-9" y="0" dy=".32em" style="text-anchor: end;">2.00e-1</text></g><g class="tick major" transform="translate(0,5.372433546784009)" style="opacity: 1;"><line x2="-6" y2="0"></line><text x="-9" y="0" dy=".32em" style="text-anchor: end;">3.00e-1</text></g><g class="tick major" transform="translate(0,242.56207225779733)" style="opacity: 1;"><line x2="-6" y2="0"></line><text x="-9" y="0" dy=".32em" style="text-anchor: end;">5.00e-2</text></g><g class="tick major" transform="translate(0,147.686216773392)" style="opacity: 1;"><line x2="-6" y2="0"></line><text x="-9" y="0" dy=".32em" style="text-anchor: end;">1.50e-1</text></g><g class="tick major" transform="translate(0,52.810361288986655)" style="opacity: 1;"><line x2="-6" y2="0"></line><text x="-9" y="0" dy=".32em" style="text-anchor: end;">2.50e-1</text></g><path class="domain" d="M-6,0H0V290H-6"></path></g><g class="y axis" transform="translate(780,0)"><g class="tick major" transform="translate(0,290)" style="opacity: 1;"><line x2="6" y2="0"></line><text x="9" y="0" dy=".32em" style="text-anchor: start;"></text></g><g class="tick major" transform="translate(0,195.12414451559465)" style="opacity: 1;"><line x2="6" y2="0"></line><text x="9" y="0" dy=".32em" style="text-anchor: start;"></text></g><g class="tick major" transform="translate(0,100.24828903118933)" style="opacity: 1;"><line x2="6" y2="0"></line><text x="9" y="0" dy=".32em" style="text-anchor: start;"></text></g><g class="tick major" transform="translate(0,5.372433546784009)" style="opacity: 1;"><line x2="6" y2="0"></line><text x="9" y="0" dy=".32em" style="text-anchor: start;"></text></g><g class="tick major" transform="translate(0,242.56207225779733)" style="opacity: 1;"><line x2="6" y2="0"></line><text x="9" y="0" dy=".32em" style="text-anchor: start;"></text></g><g class="tick major" transform="translate(0,147.686216773392)" style="opacity: 1;"><line x2="6" y2="0"></line><text x="9" y="0" dy=".32em" style="text-anchor: start;"></text></g><g class="tick major" transform="translate(0,52.810361288986655)" style="opacity: 1;"><line x2="6" y2="0"></line><text x="9" y="0" dy=".32em" style="text-anchor: start;"></text></g><path class="domain" d="M6,0H0V290H6"></path></g><text text-anchor="middle" transform="translate(-78.26086956521739,145)rotate(-90)" font-size="15px" font-family="sans-serif">Absorbance, -ln(I/Io)</text><text text-anchor="middle" transform="translate(390, -30)" font-size="15px" font-family="sans-serif">Wavelength, μm</text><line class="hover-line" x1="1" x2="1" y1="290" y2="1" style="z-index: 100; opacity: 1e-06;"></line><rect class="overlay" width="780" height="290"></rect></g><g class="context" transform="translate(90,380)"><g class="x brush" style="pointer-events: all;"><rect class="background" x="0" width="780" y="-6" height="57" style="visibility: hidden; cursor: crosshair;"></rect><rect class="extent" x="0" width="0" y="-6" height="57" style="cursor: move;"></rect><g class="resize e" transform="translate(0,0)" style="cursor: ew-resize; display: none;"><rect x="-3" width="6" height="57" y="-6" style="visibility: hidden;"></rect></g><g class="resize w" transform="translate(0,0)" style="cursor: ew-resize; display: none;"><rect x="-3" width="6" height="57" y="-6" style="visibility: hidden;"></rect></g></g><g class="x axis" transform="translate(0,50)" font-size="13px" font-family="sans-serif"><g class="tick major" transform="translate(0,0)" style="opacity: 1;"><line y2="6" x2="0"></line><text y="9" x="0" dy=".71em" style="text-anchor: middle;">2195</text></g><g class="tick major" transform="translate(78.0780780763738,0)" style="opacity: 1;"><line y2="6" x2="0"></line><text y="9" x="0" dy=".71em" style="text-anchor: middle;">2196</text></g><g class="tick major" transform="translate(156.1561561527476,0)" style="opacity: 1;"><line y2="6" x2="0"></line><text y="9" x="0" dy=".71em" style="text-anchor: middle;">2197</text></g><g class="tick major" transform="translate(234.2342342291214,0)" style="opacity: 1;"><line y2="6" x2="0"></line><text y="9" x="0" dy=".71em" style="text-anchor: middle;">2198</text></g><g class="tick major" transform="translate(312.3123123054952,0)" style="opacity: 1;"><line y2="6" x2="0"></line><text y="9" x="0" dy=".71em" style="text-anchor: middle;">2199</text></g><g class="tick major" transform="translate(390.390390381869,0)" style="opacity: 1;"><line y2="6" x2="0"></line><text y="9" x="0" dy=".71em" style="text-anchor: middle;">2200</text></g><g class="tick major" transform="translate(468.4684684582428,0)" style="opacity: 1;"><line y2="6" x2="0"></line><text y="9" x="0" dy=".71em" style="text-anchor: middle;">2201</text></g><g class="tick major" transform="translate(546.5465465346166,0)" style="opacity: 1;"><line y2="6" x2="0"></line><text y="9" x="0" dy=".71em" style="text-anchor: middle;">2202</text></g><g class="tick major" transform="translate(624.6246246109904,0)" style="opacity: 1;"><line y2="6" x2="0"></line><text y="9" x="0" dy=".71em" style="text-anchor: middle;">2203</text></g><g class="tick major" transform="translate(702.7027026873642,0)" style="opacity: 1;"><line y2="6" x2="0"></line><text y="9" x="0" dy=".71em" style="text-anchor: middle;">2204</text></g><path class="domain" d="M0,6V0H780V6"></path></g><text text-anchor="middle" transform="translate(390,90)" font-size="15px" font-family="sans-serif">Frequency, cm⁻¹</text></g><g class="legend"></g><text id="tooltip" x="780" y="388" text-anchor="right" font-family="sans-serif" font-size="11px" font-weight="bold" fill="black" style="opacity: 1e-06;"></text></svg></div>
+            </div>
+
+
+            <div class="col-lg-4" style="max-width: 900px;"> <!-- col-xs-offset-1">-->
+                <h4>Hardware Search<sub> beta</sub></h4>
+
+
+                <!--<div class="panel panel-primary">-->
+                <div role="tabpanel">
+                    <!-- Nav tabs -->
+                    <ul class="nav nav-tabs" role="tablist" id="myTab">
+                        <li role="presentation" class="active">
+                            <a href="#lasers" aria-controls="lasers" role="tab" data-toggle="tab" onclick="trackTableClick('lasers')">Light Sources</a>
+                        </li>
+                        <li role="presentation" class="">
+                            <a href="#detectors" aria-controls="detectors" role="tab" data-toggle="tab" onclick="trackTableClick('detectors')">Detectors</a>
+                        </li>
+                        <li role="presentation"><a href="#optics" aria-controls="optics" role="tab" data-toggle="tab" onclick="trackTableClick('optics/materials')">Materials</a></li>
+                        <li role="presentation">
+                            <a href="#filters" aria-controls="filters" role="tab" data-toggle="tab" onclick="trackTableClick('filters')">Filters</a>
+                        </li>
+                        <li role="presentation">
+                            <a href="#fibers" aria-controls="fibers" role="tab" data-toggle="tab" onclick="trackTableClick('fibers')">Fibers</a>
+                        </li>
+                        <li role="presentation">
+                            <a href="#mirrors" aria-controls="mirrors" role="tab" data-toggle="tab" onclick="trackTableClick('mirrors')">Mirrors</a>
+                        </li>
+                    </ul>
+
+                    <!-- Tab panes -->
+                    <div class="tab-content">
+                        <div role="tabpanel" class="tab-pane active" id="lasers">
+                            <div class="panel panel-default">
+                                <div id="laserTable" class="lasersWrapper" style="max-height: 350px; overflow-y: scroll; position: relative; padding: 0 5px;">
+                                    <table class="table">
+                                        <thead>
+                                        <tr><th align="center" width="17%">Vendor</th>
+                                            <th align="center" width="17%">Type</th>
+                                            <th align="center" width="27.5%">Center Wavenumber (cm<sup>-1</sup>)</th>
+                                            <th align="center" width="10%">Δν<br>(cm<sup>-1</sup>)</th>
+                                            <th align="center" width="15%">Power (mW)</th>
+                                            <th align="center" width="12%">Linewidth (MHz)</th></tr>
+                                        </thead>
+                                        <tbody>
+                                        <tr><td align="center" colspan="6">Specific light sources will appear here!</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div role="tabpanel" class="tab-pane" id="detectors">
+                            <div class="panel panel-default">
+                                <div id="detectorTable" class="detectorsWrapper" style="max-height: 350px; overflow-y: scroll; position: relative; padding: 0 5px;">
+                                    <table class="table">
+                                        <thead>
+                                        <tr><th align="center" width="20%">Vendor</th>
+                                            <th align="center" width="20%">Material</th>
+                                            <th align="center" width="20%">Control</th>
+                                            <th align="center" width="20%">D<sup>*</sup> Range</th>
+                                            <th align="center">Δν (μm)</th></tr>
+                                        </thead>
+                                        <tbody>
+                                        <tr><td align="center" colspan="5">Relevant detectors will appear here!</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div role="tabpanel" class="tab-pane" id="optics">
+                            <div class="panel panel-default">
+                                <div id="opticsTable" class="opticsWrapper" style="max-height: 350px; overflow-y: scroll; position: relative; padding: 0 5px;">
+                                    <table class="table">
+                                        <thead>
+                                        <tr><th align="center" width="20%">Material</th>
+                                            <th align="center" width="20%">Transmission Range (μm)</th>
+                                            <th align="center" width="20%">Index of Refraction</th>
+                                            <th align="center" width="20%">Modulus of Rupture</th>
+                                            <th align="center" width="20%">Melting Temp (<sup>○</sup>C)</th></tr>
+                                        </thead>
+                                        <tbody>
+                                        <tr><td align="center" colspan="5">Relevant optical materials will appear here!</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div role="tabpanel" class="tab-pane " id="filters">
+                            <div class="panel panel-default">
+                                <div id="filtersTable" class="filtersWrapper" style="max-height: 350px; overflow-y: scroll; position: relative; padding: 0 5px;">
+                                    <table class="table">
+                                        <thead>
+                                        <tr><th align="center" width="20%">Vendor</th>
+                                            <th align="center" width="20%">Pass band (nm)</th>
+                                            <th align="center" width="20%">Size (mm)</th>
+                                            <th align="center" width="20%">Substrate</th>
+                                            <th align="center" width="20%">Peak Transmission (%)</th></tr>
+                                        </thead>
+                                        <tbody>
+                                        <tr><td align="center" colspan="5">Relevant filters will appear here!</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div role="tabpanel" class="tab-pane" id="fibers">
+                            <div class="panel panel-default">
+                                <div id="fibersTable" class="fibersWrapper" style="max-height: 350px; overflow-y: scroll; position: relative; padding: 0 5px;">
+                                    <table class="table">
+                                        <thead>
+                                        <tr><th align="center" width="20%">Vendor</th>
+                                            <th align="center" width="15%">Material</th>
+                                            <th align="center" width="15%">Mode</th>
+                                            <th align="center" width="30%">Core Diameter (μm)</th>
+                                            <th align="center" width="20%">Wavelength range (μm)</th></tr>
+                                        </thead>
+                                        <tbody>
+                                        <tr><td align="center" colspan="5">Relevant fibers will appear here!</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div role="tabpanel" class="tab-pane" id="mirrors">
+                            <div class="panel panel-default">
+                                <div id="mirrorsTable" class="mirrorsWrapper" style="max-height: 350px; overflow-y: scroll; position: relative; padding: 0 5px;">
+                                    <table class="table">
+                                        <thead>
+                                        <tr><th align="center" width="15%">Vendor</th>
+                                            <th align="center" width="20%">Reflectivity (%)</th>
+                                            <th align="center" width="20%">Wavelength range (nm)</th>
+                                            <th align="center" width="25%">Radius of curvature (m)</th>
+                                            <th align="center" width="20%">Diameter (in) </th></tr>
+                                        </thead>
+                                        <tbody>
+                                        <tr><td align="center" colspan="5">Relevant dielectric mirrors will appear here!</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4" style="max-width: 900px;">
+
+                Favorite vendor not included?  Please <a href="mailto:info@spectraplot.com">let us know</a>
+                <h6>UV and Vis hardware coming soon</h6>
+            </div>
+
+        </div> <!-- row -->
+
+        <div class="modal fade" id="TOS" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">×</span><span class="sr-only">Close</span></button>
+                        <h4 class="modal-title" id="myModalLabel">Terms of Service</h4>
+                    </div>
+                    <div class="modal-body">
+                        <p align="left">This website (including all content and functions made available on or accessed through this site) is provided on an "as is" basis. While every effort has been made to ensure the accuracy of the information provided on this website, the information may contain errors, including technical or typographical errors. Use of information contained herein is at the user's risk. Information is subject to change or updating without notice. The products and/or the services described may be altered at any time, also without notice. Please contact SpectraPlot for the latest information.  Please be aware that SpectraPlot may not use or have registered some of the aforementioned marks in other countries.</p>
+                        <p align="left">It is entirely the user's responsibility to take precautions to be certain that any material taken from this website is free of viruses, worms, Trojan horses or other harmful or potentially harmful items. SpectraPlot DISCLAIMS ALL LIABILITY TO ANY PARTY FOR ANY DIRECT, INDIRECT, SPECIAL, CONSEQUENTIAL OR OTHER DAMAGES IN CONNECTION WITH ANY USE OF THIS WEBSITE, OR ANY HYPER-LINKED OR OTHER ACCESSIBLE WEB SITE, INCLUDING, WITHOUT LIMITATION, ALL LOST PROFITS, DAMAGES FROM BUSINESS INTERRUPTION, AND LOSS OF PROGRAMS OR OTHER DATA, REGARDLESS OF WHETHER WE ARE EXPRESSLY ADVISED OF THE POSSIBILITY OF SUCH DAMAGES OCCURRING.</p>
+                        <p align="left">Users are forbidden from abusing SpectraPlot in any way shape or form: abuse includes but is not limited to: writing scripts to automatically run simulations; launching denial of service attacks.</p>
+                    </div>
+                    <div class="modal-footer">
+                        <div class="col-xs-3 col-xs-offset-9"><button type="button" class="btn btn-default" data-dismiss="modal">OK</button></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal fade" id="about" tabindex="-1" role="dialog" aria-labelledby="About" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">×</span><span class="sr-only">Close</span></button>
+                        <h4 class="modal-title" id="myModalLabel">About SpectraPlot</h4>
+                    </div>
+                    <div class="modal-body text-left">
+                        <p> SpectraPlot Ltd. is a 501(c)(3) non-profit organization.  Our mission is twofold: 1) to strengthen the spectroscopy community and 2) to organize the photonics industry's information for spectroscopists.</p>
+                        <p>To achieve these goals, Spectraplot offers integrated search tools for wavelength-dependent data (including spectral simulators and hardware listings) organized around function and use.  These tools are aimed to accelerate spectroscopic and optical engineering and to remove transactional friction in the photonics industry. We hope you will join us in this mission by simply using our tools. If you are a vendor interested in either supporting SpectraPlot or including your catalogue on the site, get in touch with us at <a href="mailto:info@spectraplot.com">info@spectraplot.com</a>.  A couple FAQs are addressed below.</p>
+                        <h4>Q. But really, what is SpectraPlot?</h4>
+                        <p>A. SpectraPlot is a free, openly-available tool for scientists and engineers to simulate spectroscopic data and find the hardware you need to put spectroscopy into practice.  SpectraPlot is an ongoing project, and we'll continue to add tools, databases, and calculators that benefit the science and engineering communities that advance and leverage spectroscopy.</p>
+                        <h4>Q. Who are you?</h4>
+                        <p>A. SpectraPlot was conceived and built by 4 PhDs who specialize in ultra-violet, near- and mid-infrared spectroscopic gas sensing and imaging techniques: <a href="http://spectrum.seas.ucla.edu/" target="_blank">Prof. Mitchell Spearrin of UCLA</a>, <a href="http://www.goldensteingroup.com/" target="_blank">Prof. Chris Goldenstein of Purdue</a>, <a href="https://www.linkedin.com/in/christopher-strand-5bbb25103" target="_blank">Dr. Christopher Strand at Stanford</a>, and <a href="https://www.linkedin.com/in/victor-miller-976b8416" target="_blank">Dr. Victor Miller</a>.</p>
+                        <h4>Q. Can I get some details on how this works and what assumptions are made in the simulation?</h4>
+                        <p>A. Yep!  Check out our paper in <a href="http://www.sciencedirect.com/science/article/pii/S0022407317302996" target="_blank">JQSRT</a> or <a href="https://arxiv.org/abs/1709.06220" target="_blank">arXiv</a>.  Additionally, check out the <a href="http://www.hitran.org" target="_blank">HITRAN</a> and <a href="https://www.nist.gov/pml/atomic-spectra-database" target="_blank">NIST</a> websites for more information about the databases we use.
+                        </p></div>
+                </div>
+            </div>
+        </div>
+        <div class="modal fade" id="feedback" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">×</span><span class="sr-only">Close</span></button>
+                        <h4 class="modal-title" id="myModalLabel">SpectraPlot Contact</h4>
+                    </div>
+                    <div class="modal-body text-center">
+                        <iframe src="https://docs.google.com/forms/d/14NoSj-F0s2qBXNy-1z9fepdPsMJs47ZYivNRGmE55oI/viewform?embedded=true" width="550" height="717" frameborder="0" marginheight="0" marginwidth="0">Loading...</iframe>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row col-xs-12">
+            <div class="col-xs-12" align="right">
+                <a style="color: #171c68;" href="#" data-toggle="modal" data-target="#TOS">Terms</a>
+            </div>
+        </div>
+
+        <div class="row col-xs-12">
+            <div class="col-xs-12" align="right">
+                <a style="color: #171c68;" href="#about" data-target="#about" data-toggle="modal">About</a>
+            </div>
+        </div>
+
+
+
+        <div class="row col-xs-12">
+            <div class="col-xs-12" align="right">
+                <!--<a href="#feedback" data-target="#feedback" data-toggle="modal">Contact</a>-->
+                <a style="color: #171c68;" href="mailto:info@spectraplot.com">Contact</a>
+            </div>
+        </div>
+        <div class="row col-xs-12">
+            <div class="col-xs-12" align="right">
+                2019 © SpectraPlot Ltd.
+            </div>
+        </div>
+
+    </div> <!-- container -->
+</section>
+
+<div class="modal fade" id="myModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">×</span><span class="sr-only">Close</span></button>
+                <h4 class="modal-title" id="myModalLabel">Simulation Details</h4>
+            </div>
+            <div class="modal-body">
+                <span style="font-size:14pt;font-weight:bold;color: #ff0000;">For more details, check out <a href="http://www.sciencedirect.com/science/article/pii/S0022407317302996" target="_blank">our paper</a> in JQSRT.</span>
+                <h3>The Basics</h3>
+                <p>You can run up to 3 simulations, each with 3 species (for a total of 9), before you must clear the plot.</p>
+                <p>All simulations assume a binary mixture of the absorbing/emitting species in air.</p>
+                <p>Absorption simulations are performed using the HITRAN 2012 and HITEMP 2010 databases.  Information on HITRAN and HITEMP can be found <a href="http://www.cfa.harvard.edu/hitran/" target="_blank">here</a></p>
+                <p>HITEMP simulations take much longer to run than HITRAN simulations, so please choose your simulation window wisely.</p>
+                <p>Please don't hesitate to get in touch using the 'Contact' link in the bottom right!</p>
+                <br>
+                <h3>The Details</h3>
+                <p>Absorbance is defined using Beer's Law: I/I<sub>o</sub> = exp(-α) = exp(-nσL).</p>
+                <p>CO<sub>2</sub> and H<sub>2</sub>O HITEMP simulations exclude all lines with linestrengths less than 10<sup>-50</sup> cm<sup>-1</sup>/(molecule-cm<sup>-2</sup>).</p>
+                <p>A Voigt lineshape is used when the Lorentzian-to-Doppler width ratio (L/D) is from 0.01 to 100. Gaussian and Lorentzian lineshapes are used when L/D &lt; 0.01 and &gt; 100, respectively.</p>
+                <p>The power-law model, Y(T) = Y(T<sub>o</sub>)(296/T)<sup>n</sup> with T<sub>o</sub> = 296 K, is used to model the temperature dependence of all broadening- and pressure-shift coefficients. For all transitions, the exponent, n, is set equal to 0.75 and 0.96 for the self-broadening and air-pressure-shift coefficients, respectively.</p>
+                <p>At temperatures above 3000 K, the partition function of the absorbing species is obtained from linearly extrapolating the data given in HITRAN 2008 from 70 to 3000 K.</p>
+                <p>The simulation width (wing<sub>eval</sub>) for all absorption features is 4*P cm<sup>-1</sup>.</p>
+            </div>
+            <div class="modal-footer">
+                <div class="col-xs-3 col-xs-offset-9"><button type="button" class="btn btn-default" data-dismiss="modal">Got it</button></div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="nistModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">×</span><span class="sr-only">Close</span></button>
+                <h4 class="modal-title" id="myModalLabel">Simulation Details</h4>
+            </div>
+            <div class="modal-body">
+                <span style="font-size:14pt;font-weight:bold;color: #ff0000;">For more details, check out <a href="http://www.sciencedirect.com/science/article/pii/S0022407317302996" target="_blank">our paper</a> in JQSRT.</span>
+                <h3>The Basics</h3>
+                <p>You can run up to 3 simulations, each with 3 species (for a total of 9), before you must clear the plot.</p>
+                <p>Absorption simulations of atomic spectra are performed using the NIST Atomic Spectra Database (ASD). Information on NIST’s ASD can be found <a href="http://www.nist.gov/pml/data/asd.cfm" target="_blank">here</a></p>
+                <p>All wavelengths and frequencies correspond to vacuum values.</p>
+                <p>Unique to SpectraPlot and NIST simulations, we require the user to specify an electronic temperature, T<sub>elec</sub>, and a kinetic temperature, T, which is used to calculate the number density of the gas and the Doppler width.  T<sub>elec</sub> is used to calculate the electronic partition function, the population in the absorption state, and the transition linestrength. If the gas is in equilibrium, T<sub>elec</sub> should be set equal to T. </p>
+                <p>NIST’s ASD does not provide collisional-broadening coefficients for any transitions. However, γ(To) and its temperature exponent, n, can be specified by the user. More information is provided below.</p>
+                <p>Please don't hesitate to get in touch using the 'Contact' link in the bottom right!</p>
+                <br>
+                <h3>The Details</h3>
+                <p>Absorbance is defined using Beer's Law: I/I<sub>o</sub> = exp(-α) = exp(-nσL).</p>
+
+                <p>Spectra for ionization levels greater than X<sup>2+</sup> (e.g., Na<sup>3+</sup>) are not provided in SpectraPlot, but spectroscopic parameters for ionization states greater than 2+ are available from NIST in most cases. </p>
+
+                <p>If γ(T<sub>o</sub>)  and n are specified by the user, γ is calculated at the user-specified temperature and applied to all transitions in the simulation range according to: γ (T) = γ (T<sub>o</sub>)(296/T)<sup>n</sup> with T<sub>o</sub> = 296 K.  γ(T) is the collisional-broadening coefficient of the mixture and defined according to: Δv<sub>c</sub>=2Pγ(T) where Δv<sub>c</sub> is the collisional (i.e., Lorentzian) full-width at half-maximum in units of cm<sup>-1</sup> and P is the gas pressure in units of atm. </p>
+
+                <p>A Voigt lineshape is used when the Lorentzian-to-Doppler width ratio (L/D) is from 0.01 to 100. Gaussian and Lorentzian lineshapes are used when L/D &lt; 0.01 and &gt; 100, respectively.</p>
+
+                <p>The electronic partition function, Q<sub>elec</sub>, is calculated at the user-specified electronic temperature, T<sub>elec</sub>, according to the energy levels and degeneracies provided by NIST’s ASD. If the degeneracy of a particular state is not given by NIST, an arbitrary degeneracy of 3 is used for that level in the partition sum. At T<sub>elec</sub> &gt; 10 million Kelvin, Q<sub>elec</sub> is linearly extrapolated from a look-up table calculated by Team SpectraPlot from 0.1 Kelvin to 100 million Kelvin.</p>
+
+                <p>The simulation width (wing<sub>eval</sub>) for all absorption features varies as a function of pressure.  For pressures less than 0.5 atm, wing<sub>eval</sub> = 2 cm<sup>-1</sup>.  For pressures between 0.5 and 5 atm, wing<sub>eval</sub> = 10*P cm<sup>-1</sup>, and for pressures greater than 5 atm, wing<sub>eval</sub> = 50 cm<sup>-1</sup>.</p>
+                <p>Please consult the <a href="http://www.nist.gov/pml/data/asd.cfm" target="_blank">NIST ASD website</a> for proper bibliographic sources and references.</p>
+            </div>
+            <div class="modal-footer">
+                <div class="col-xs-3 col-xs-offset-9"><button type="button" class="btn btn-default" data-dismiss="modal">Got it</button></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+</body></html>
