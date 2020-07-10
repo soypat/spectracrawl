@@ -16,7 +16,7 @@ HITRAN:
   T: 253.0         # [K]
   p: 0.35          # [atm]
   L: 6000e3        # [cm]
-  startNu: 2800    # [cm-1]
+  startNu: 9100    # [cm-1]
   endNu: 9300      # [cm-1]
   stepNu: 0.01     # [cm-1] min = 0.01
   startLambda: 1   # [μm]  Lambdas ignored if Nus not null
@@ -27,6 +27,7 @@ spectraplot:
   maxNumberOfPlots: 3
   maxRange: 100    # [cm-1]
   calcTimeout_s: 2 # integer [s]
+  calcDelay_s: 0   # integer [s]
 
 log:
   silent: false

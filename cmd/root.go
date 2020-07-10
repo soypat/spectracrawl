@@ -42,23 +42,37 @@ var rootCmd = &cobra.Command{
 	Use:   "spectracrawl",
 	Short: "Scrapes spectraplot gas a absorption data",
 	Long: `Scrapes spectraplot gas a absorption data
+
+See https://www.cfa.harvard.edu/hitran/Download/HITRAN2012.pdf
+for a complete paper on HITRAN2012 spectral coverage of 
+available gases.
+
+Code is open source and protected by Apache license 2.0
+
+Code and example config file at:
+http://github.com/soypat/spectracrawl
 `,
 	Args: func(cmd *cobra.Command, args []string) error {
 		err := checkConfig()
-		log(err)
+		if err != nil {
+			logf("[err] error in config. %s", err)
+		}
 		return err
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		log("[inf] starting program")
 		if err := runner(args); err != nil {
-			fmt.Printf("%s", err)
+			logf("[err] %s",err)
+			time.Sleep(time.Second*10)
 			os.Exit(1)
 		}
 	},
 }
 
+const fpsep = string(filepath.Separator)
+
 const (
-	maxWaveNumber        = 17000.0
+	maxWaveNumber        = 47365.0
 	maxTemp              = 4e12
 	minNuStep            = 0.01
 	downloadTimeoutAfter = time.Second * 2
@@ -68,7 +82,7 @@ const urlStart = "http://www.spectraplot.com/absorption"
 func runner(_ []string) error {
 	chromeDriver := wd.NewChromeDriver(viper.GetString("browser.driverPath"))
 	downloadPath := viper.GetString("browser.downloadDir")
-	downloadedFileName := downloadPath + string(filepath.Separator) + defaultZipName
+	downloadedFileName := downloadPath + fpsep + defaultZipName
 	err := chromeDriver.Start()
 	if err != nil {
 		return err
@@ -80,13 +94,16 @@ func runner(_ []string) error {
 	if err != nil {
 		return err
 	}
+	defer session.CloseCurrentWindow()
+	defer session.Delete()
 	if err = session.Url(urlStart); err != nil {
 		return err
 	}
 	startNu, endNu := viper.GetFloat64("HITRAN.startNu"), viper.GetFloat64("HITRAN.endNu")
 	intervals := nuIntervals(startNu, endNu)
 	plotCount := 0
-	for _, interval := range intervals {
+	_ = os.Remove(downloadedFileName) // delete any previous spectraplot file if present
+	for intervalCount, interval := range intervals {
 		err = setHitran(session, spectraConditions{
 			T:       viper.GetFloat64("HITRAN.T"),
 			P:       viper.GetFloat64("HITRAN.p"),
@@ -105,10 +122,13 @@ func runner(_ []string) error {
 			_ = leftClickSelector(session, `#clear`)
 			continue
 		}
+		time.Sleep(time.Duration(viper.GetInt("spectraplot.calcDelay_s"))*time.Second)
+		logf("[scp] calculating nu=[%.f-%.f] for %s",interval[0],interval[1],viper.GetString("HITRAN.gasID"))
 		_ = leftClickSelector(session, `#calculate_hitran`)
 		plotCount++
-		if plotCount == viper.GetInt("spectraplot.maxNumberOfPlots") {
+		if plotCount == viper.GetInt("spectraplot.maxNumberOfPlots") || intervalCount == len(intervals)-1 {
 			waitForCalculation(session)
+			logf("[scp] downloading file. finished %d/%d",intervalCount+1,len(intervals))
 			_ = leftClickSelector(session, `#data`)
 			_ = leftClickSelector(session, `#clear`)
 			err = waitForDownload(downloadedFileName)
@@ -123,7 +143,7 @@ func runner(_ []string) error {
 			plotCount = 0
 		}
 	}
-	time.Sleep(1e9 * 30)
+	log("[inf] finish program")
 	return nil
 }
 
@@ -158,7 +178,22 @@ func checkConfig() error {
 		logFile = fo
 		defer logFile.Close()
 	}
-	// timeouts
+	log("[inf] start program")
+	// OVERRIDES
+	if gasFlag != "" {
+		viper.Set("HITRAN.gasID", gasFlag)
+	}
+	if nuSFlag >= 0 {
+		viper.Set("HITRAN.startNu",nuSFlag)
+	}
+	if nuEFlag >= 0 {
+		viper.Set("HITRAN.endNu",nuEFlag)
+	}
+	if ppmFlag >= 0 {
+		viper.Set("HITRAN.ppm",ppmFlag)
+	}
+	// Config file information sanitizing
+	// timeouts and delays
 	downloadTimeout := viper.GetInt("output.timeout_s")
 	if downloadTimeout <= 0 {
 		log("[inf] download timeout (output.timeout_s) set to 99 seconds")
@@ -169,8 +204,12 @@ func checkConfig() error {
 		log("[inf] spectraplot.calcTimeout_s set to 99 seconds")
 		viper.Set("spectraplot.calcTimeout_s", 99)
 	}
-	//
-	log("[inf] start program")
+	calcDelay:=viper.GetInt("spectraplot.calcDelay_s")
+	if calcDelay < 0 {
+		log("[inf] calc delay (spectraplot.calcDelay_s) set to 1 second")
+		viper.Set("spectraplot.calcDelay_s", 1)
+	}
+	// HITRAN
 	nuStart, nuEnd := viper.GetFloat64("HITRAN.startNu"), viper.GetFloat64("HITRAN.endNu")
 	lambdaStart, lambdaEnd := viper.GetFloat64("HITRAN.startLambda"), viper.GetFloat64("HITRAN.endLambda")
 	if nuStart == 0 && nuEnd == 0 {
@@ -190,6 +229,7 @@ func checkConfig() error {
 	if T <= 0 || T > maxTemp || p <= 0 || L <= 0 {
 		return fmt.Errorf("temp to high or negative/zero value for pressure/temp/length.")
 	}
+
 	if ppm := viper.GetFloat64("HITRAN.ppm"); ppm <= 0 || ppm > 1e6 {
 		return fmt.Errorf("ppm <= 0 or greater than 1e6. got ppm = %f", ppm)
 	}
@@ -198,23 +238,27 @@ func checkConfig() error {
 		return fmt.Errorf("formatter '%s' invalid for float. %s", format, err.Error())
 	}
 	// paths and files
-	downloadDir := strings.ReplaceAll(viper.GetString("browser.downloadDir"), "\\", "/")
+	// first sanitize paths
+	viper.Set("browser.downloadDir", sanitizePath(viper.GetString("browser.downloadDir")))
+	viper.Set("browser.driverPath", sanitizePath(viper.GetString("browser.driverPath")))
+	viper.Set("output.dir", sanitizePath(viper.GetString("output.dir")))
+	downloadDir := viper.GetString("browser.downloadDir")
 	_, err := os.Stat(downloadDir)
 	if os.IsNotExist(err) {
 		return fmt.Errorf("directory does not exist. %s", err)
 	}
-	driverPath := strings.ReplaceAll(viper.GetString("browser.driverPath"), "\\", "/")
+	driverPath := viper.GetString("browser.driverPath")
 	_, err = os.Stat(driverPath)
 	if os.IsNotExist(err) {
 		return fmt.Errorf("driver does not exist in path given. %s", err)
 	}
 	gasID := viper.GetString("HITRAN.gasID")
-	if gasID == "" {
-		return fmt.Errorf("bad")
+	if gasID == ""  {
+		return fmt.Errorf("null HITRAN.gasID")
 	}
 	outputPath := viper.GetString("output.dir")
 	if outputPath == "auto" {
-		outputPath = fmt.Sprintf("."+string(filepath.Separator)+"output"+string(filepath.Separator)+"%s", gasID)
+		outputPath = fmt.Sprintf("."+fpsep+"output"+fpsep+"%s", gasID)
 	}
 	_, err = os.Stat(outputPath)
 	if os.IsNotExist(err) {
@@ -224,8 +268,8 @@ func checkConfig() error {
 			return err
 		}
 	}
-	viper.Set("browser.downloadDir", strings.TrimSuffix(downloadDir, "/"))
-	viper.Set("output.dir", strings.TrimSuffix(outputPath, "/"))
+	viper.Set("browser.downloadDir", downloadDir)
+	viper.Set("output.dir", outputPath)
 	return nil
 }
 
@@ -348,6 +392,13 @@ func nuIntervals(nuStart, nuEnd float64) (intervals [][2]float64) {
 	return intervals
 }
 
+func sanitizePath(path string) string {
+	fpsep := string(filepath.Separator)
+	path = strings.ReplaceAll(strings.ReplaceAll(path, "\\", fpsep), "/", fpsep)
+	path = strings.TrimSuffix(path, fpsep)
+	return path
+}
+
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
@@ -357,9 +408,16 @@ func Execute() {
 	}
 }
 
+var gasFlag string
+var ppmFlag, nuSFlag, nuEFlag float64
 func init() {
 	cobra.OnInitialize(initConfig)
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", ".spectracrawl.yml", "config file (default is $HOME/.spectracrawl.yaml)")
+	rootCmd.PersistentFlags().StringVar(&gasFlag, "gas", "", "HITRAN.gasID override")
+	rootCmd.PersistentFlags().Float64Var(&ppmFlag, "ppm",-1,"HITRAN.ppm override")
+	rootCmd.PersistentFlags().Float64Var(&nuSFlag, "nu1",-1,"HITRAN.startNu override")
+	rootCmd.PersistentFlags().Float64Var(&nuEFlag, "nu2",-1,"HITRAN.endNu override")
+
 }
 
 // initConfig reads in config file and ENV variables if set.
