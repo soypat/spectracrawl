@@ -4,12 +4,9 @@ import (
 	"archive/zip"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 )
-
-const fpsep = string(filepath.Separator)
 
 const (
 	testDataDir   = ".." + fpsep + "testdata"
@@ -17,6 +14,35 @@ const (
 	testJobFormat = testDataDir + fpsep + "CH4,x=1e-6,T=300K,P=1atm,L=100cm,simNum%d.csv"
 	numberOfJobs  = 3
 )
+
+func TestPrettyFormat(t *testing.T) {
+	tests := map[float64]string{
+		2:        "2",
+		999:        "999",
+		999.999:    "999.999",
+		999.9999:   "1e+03",
+		1000:       "1e+03",
+		1e99:       "1e+99",
+		2.1:        "2.100",
+		2.0001:     "2",
+		0.35:       "0.350",
+		0.0000432:  "4.320e-05",
+		0.0009:     "9e-04",
+		0.0009999:  "9.999e-04",
+		0.00099999: "0.001",
+	}
+	for input, expected := range tests {
+		output := prettyF(input)
+		negOutput := prettyF(-input)
+		if output != expected {
+			t.Errorf("expected :%s\tgot: %s", expected, output)
+		}
+		if negOutput != "-"+expected {
+			t.Errorf("expected :%s\tgot: %s", "-"+expected, output)
+		}
+
+	}
+}
 
 func TestJoinSpectra(t *testing.T) {
 	// Create a buffer to write our archive to.
@@ -32,7 +58,7 @@ func TestJoinSpectra(t *testing.T) {
 }
 
 func createSpectraZip() error {
-	fo,err:= os.Create(zipname)
+	fo, err := os.Create(zipname)
 	if err != nil {
 		return err
 	}
@@ -73,6 +99,6 @@ func createSpectraZip() error {
 }
 
 func splitNameAndDir(filename string) (name, dir string) {
-	name,dir = filename[strings.LastIndex(filename,fpsep)+1:], filename[:strings.LastIndex(filename,fpsep)-1]
+	name, dir = filename[strings.LastIndex(filename, fpsep)+1:], filename[:strings.LastIndex(filename, fpsep)-1]
 	return
 }

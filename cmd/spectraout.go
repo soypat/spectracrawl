@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"encoding/csv"
 	"fmt"
+	"math"
 	"os"
 	"sort"
 	"strconv"
@@ -100,7 +101,6 @@ func processSpectra(zipName, outputDir string) error {
 	return nil
 }
 
-
 func generateHeader(conditions []string) (h []string) {
 	h = append(h, "nu")
 	cond := strings.Join(conditions, "/")
@@ -149,26 +149,31 @@ func generateFilename(c spectraConditions, interval [2]float64) string {
 	return fmt.Sprintf("nu=%.f-%.f%s%s.csv", interval[0], interval[1], sep, strings.Join(strcond, sep))
 }
 
-func floor(f float64) float64 { return float64(int(f)) }
-func abs(f float64) float64 {
-	if f < 0 {
-		return -f
-	}
-	return f
-}
-
 func prettyF(f float64) string {
-	format := `%{front}.3`
-	if f >= 1e3 || abs(f-floor(f)) < 1e-3 {
+	format := `%{front}.{back}`
+	isNegative := f < 0
+	f = math.Abs(f)
+	if f+0.001 > 1e3 {
+		f = 0.001 + f
+	} else if f+1e-7 > 1e-3 {
+		f = f + 1e-7
+	}
+	if f >= 1e3 {
+		f = math.Floor(f)
+	}
+	dec := f - math.Floor(f)
+	if (dec > 0 && dec >= 1e-3) || math.Log10(f) < -3 {
+		format = strings.Replace(format, "{back}", "3", 1)
+	}
+	if f <= 1e-3 || f >= 1e3 {
 		format = format + "e"
-		format = strings.Replace(format, "3", "", 1)
-		format = strings.Replace(format, "{front}", "4", 1)
 	} else {
 		format = format + "f"
 	}
-	if f-floor(f) > 0 { // no decimal
-		format = strings.Replace(format, "3", "", 1)
+	if isNegative {
+		f = -1 * f
 	}
 	format = strings.Replace(format, "{front}", "", 1)
+	format = strings.Replace(format, "{back}", "", 1)
 	return fmt.Sprintf(format, f)
 }
