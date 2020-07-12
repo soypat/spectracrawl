@@ -5,7 +5,6 @@ import (
 	"encoding/csv"
 	"fmt"
 	"os"
-	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -77,9 +76,12 @@ func processSpectra(zipName, outputDir string) error {
 	}
 	sort.Sort(byNuMin(allRecords))
 	minWN, maxWN := allRecords[0].nuMin, allRecords[len(allRecords)-1].nuMax
-	sep := ","
-	outputName := fmt.Sprintf("nu=%.f-%.f%s%s.csv", minWN, maxWN, sep, strings.Join(conditions, sep))
-	f, err := os.Create(outputDir + string(filepath.Separator) + outputName)
+	spectraCond, err := parseSpectraConditions(conditions)
+	if err != nil {
+		return err
+	}
+	outputName := generateFilename(spectraCond, [2]float64{minWN, maxWN}) // fmt.Sprintf("nu=%.f-%.f%s%s.csv", minWN, maxWN, sep, strings.Join(conditions, sep))
+	f, err := os.Create(outputDir + fpsep + outputName)
 	if err != nil {
 		return err
 	}
@@ -98,8 +100,75 @@ func processSpectra(zipName, outputDir string) error {
 	return nil
 }
 
+
 func generateHeader(conditions []string) (h []string) {
 	h = append(h, "nu")
 	cond := strings.Join(conditions, "/")
 	return append(h, cond)
+}
+
+func parseSpectraConditions(conditionSlice []string) (c spectraConditions, err error) {
+	var f float64
+	for _, val := range conditionSlice {
+		keyval := strings.Split(val, "=")
+		if len(keyval) > 2 {
+			err = fmt.Errorf("expected spectra key-value in parseSpectraConditions")
+			return
+		} else if len(keyval) == 1 {
+			c.gasID = keyval[0]
+			continue
+		}
+		switch keyval[0] {
+		case "x":
+			f, err = strconv.ParseFloat(keyval[1], 64)
+			c.Ppm = f * 1e6
+		case "T":
+			f, err = strconv.ParseFloat(strings.ReplaceAll(keyval[1], "K", ""), 64)
+			c.T = f
+		case "P":
+			f, err = strconv.ParseFloat(strings.ReplaceAll(keyval[1], "atm", ""), 64)
+			c.P = f
+		case "L":
+			f, err = strconv.ParseFloat(strings.ReplaceAll(keyval[1], "cm", ""), 64)
+			c.L = f
+		default:
+			err = fmt.Errorf("unknown key value pair %s:%s", keyval[0], keyval[1])
+		}
+		if err != nil {
+			break
+		}
+	}
+	return
+}
+
+func generateFilename(c spectraConditions, interval [2]float64) string {
+	var strcond []string
+	sep := ","
+	strcond = append(strcond, c.gasID,
+		"x="+prettyF(c.Ppm*1e-6), "T="+prettyF(c.T)+"K", "P="+prettyF(c.P)+"atm", "L="+prettyF(c.L)+"cm")
+	return fmt.Sprintf("nu=%.f-%.f%s%s.csv", interval[0], interval[1], sep, strings.Join(strcond, sep))
+}
+
+func floor(f float64) float64 { return float64(int(f)) }
+func abs(f float64) float64 {
+	if f < 0 {
+		return -f
+	}
+	return f
+}
+
+func prettyF(f float64) string {
+	format := `%{front}.3`
+	if f >= 1e3 || abs(f-floor(f)) < 1e-3 {
+		format = format + "e"
+		format = strings.Replace(format, "3", "", 1)
+		format = strings.Replace(format, "{front}", "4", 1)
+	} else {
+		format = format + "f"
+	}
+	if f-floor(f) > 0 { // no decimal
+		format = strings.Replace(format, "3", "", 1)
+	}
+	format = strings.Replace(format, "{front}", "", 1)
+	return fmt.Sprintf(format, f)
 }

@@ -28,6 +28,13 @@ import (
 	"time"
 )
 
+var (
+	ErrPageScan       = fmt.Errorf("spectracrawl: page not loaded or bad server response")
+	ErrTimeout        = fmt.Errorf("spectracrawl: timeout")
+	ErrDanger         = fmt.Errorf("spectracrawl: danger message popup encountered")
+	ErrDownloadedFile = fmt.Errorf("spectracrawl: downloaded file missing or corrupt")
+)
+
 var logFile *os.File
 
 type spectraConditions struct {
@@ -60,10 +67,11 @@ http://github.com/soypat/spectracrawl
 		return err
 	},
 	Run: func(cmd *cobra.Command, args []string) {
+		defer logFile.Close()
 		log("[inf] starting program")
 		if err := runner(args); err != nil {
-			logf("[err] %s",err)
-			time.Sleep(time.Second*10)
+			logf("[err] %s", err)
+			//time.Sleep(time.Second * 10)
 			os.Exit(1)
 		}
 	},
@@ -101,10 +109,54 @@ func runner(_ []string) error {
 	}
 	startNu, endNu := viper.GetFloat64("HITRAN.startNu"), viper.GetFloat64("HITRAN.endNu")
 	intervals := nuIntervals(startNu, endNu)
-	plotCount := 0
 	_ = os.Remove(downloadedFileName) // delete any previous spectraplot file if present
-	for intervalCount, interval := range intervals {
-		err = setHitran(session, spectraConditions{
+	jobQuantity := viper.GetInt("spectraplot.maxNumberOfPlots")
+	for jobNumber := jobQuantity; jobNumber < len(intervals)+jobQuantity; jobNumber += jobQuantity {
+		if jobNumber > len(intervals) {
+			jobNumber = len(intervals)
+		}
+		var processInterval [][2]float64
+		if len(intervals) < jobQuantity { // boundary case:
+			processInterval = intervals[0:jobNumber]
+		} else { //usual case:
+			processInterval = intervals[jobNumber-jobQuantity : jobNumber]
+		}
+		if !viper.GetBool("output.replaceExisting") {
+			expectedFilename := generateFilename(spectraConditions{
+				T:     viper.GetFloat64("HITRAN.T"),
+				P:     viper.GetFloat64("HITRAN.p"),
+				L:     viper.GetFloat64("HITRAN.L"),
+				Ppm:   viper.GetFloat64("HITRAN.ppm"),
+				gasID: viper.GetString("HITRAN.gasID"),
+			}, [2]float64{processInterval[0][0], processInterval[len(processInterval)-1][1]})
+			if _, err := os.Stat(viper.GetString("output.dir") + fpsep + expectedFilename); !os.IsNotExist(err) {
+				logf("[inf] file exists. skipping %s", expectedFilename)
+				continue // file exists and we do not want to replace existing, skip work
+			}
+		}
+		err := makeFile(session, processInterval)
+		if err == ErrDownloadedFile {
+			continue
+		} else if err == ErrPageScan {
+			logf("[err] page not loaded correctly. reloading page and skipping interval")
+			err := session.Url(urlStart)
+			if err != nil {
+				return err
+			}
+			continue
+		} else if err != nil {
+			return err
+		}
+		logf("[scp] file downloaded. finished %d/%d", jobNumber, len(intervals))
+	}
+	log("[inf] finish program")
+	return nil
+}
+
+func makeFile(s *wd.Session, intervals [][2]float64) error {
+	downloadedFileName := viper.GetString("browser.downloadDir") + fpsep + defaultZipName
+	for _, interval := range intervals {
+		err := setHitran(s, spectraConditions{
 			T:       viper.GetFloat64("HITRAN.T"),
 			P:       viper.GetFloat64("HITRAN.p"),
 			L:       viper.GetFloat64("HITRAN.L"),
@@ -114,36 +166,43 @@ func runner(_ []string) error {
 			Ppm:     viper.GetFloat64("HITRAN.ppm"),
 			gasID:   viper.GetString("HITRAN.gasID"),
 		})
-		if err != nil {
+		if err == ErrPageScan {
+			return ErrPageScan
+		} else if err != nil {
 			return err
 		}
-		err = waitForCalculation(session)
-		if err != nil {
-			_ = leftClickSelector(session, `#clear`)
+		err = waitForCalculation(s)
+		if err == ErrTimeout {
+			log("[warn] calc timeout! dropping data and resuming work")
+			_ = leftClickSelector(s, `#clear`)
 			continue
+		} else if err == ErrDanger {
+			log("[warn] calc error! dropping data and try to resume")
+			_ = leftClickSelector(s, `#clear`)
+			continue
+		} else if err != nil {
+			return err
 		}
-		time.Sleep(time.Duration(viper.GetInt("spectraplot.calcDelay_s"))*time.Second)
-		logf("[scp] calculating nu=[%.f-%.f] for %s",interval[0],interval[1],viper.GetString("HITRAN.gasID"))
-		_ = leftClickSelector(session, `#calculate_hitran`)
-		plotCount++
-		if plotCount == viper.GetInt("spectraplot.maxNumberOfPlots") || intervalCount == len(intervals)-1 {
-			waitForCalculation(session)
-			logf("[scp] downloading file. finished %d/%d",intervalCount+1,len(intervals))
-			_ = leftClickSelector(session, `#data`)
-			_ = leftClickSelector(session, `#clear`)
-			err = waitForDownload(downloadedFileName)
-			err = processSpectra(downloadedFileName, viper.GetString("output.dir"))
-			if err != nil {
-				return err
-			}
-			err = os.Remove(downloadedFileName)
-			if err != nil {
-				return err
-			}
-			plotCount = 0
-		}
+		time.Sleep(time.Duration(viper.GetInt("spectraplot.calcDelay_s")) * time.Second)
+		logf("[scp] calculating nu=[%.f-%.f] for %s", interval[0], interval[1], viper.GetString("HITRAN.gasID"))
+		_ = leftClickSelector(s, `#calculate_hitran`)
 	}
-	log("[inf] finish program")
+	err := waitForCalculation(s)
+	if err == ErrTimeout {
+		log("[warn] calc timeout! downloading data")
+	}
+	_ = leftClickSelector(s, `#data`)
+	err = waitForDownload(downloadedFileName)
+	_ = leftClickSelector(s, `#clear`)
+	err = processSpectra(downloadedFileName, viper.GetString("output.dir"))
+	if err != nil {
+		logf("[warn] an error ocurred processing interval [%.f-%.f]. %s", intervals[0][0], intervals[len(intervals)-1][1], err)
+	}
+	err = os.Remove(downloadedFileName)
+	if err != nil {
+		logf("[inf] fail downloaded file removal. %s", err)
+		return ErrDownloadedFile
+	}
 	return nil
 }
 
@@ -163,7 +222,7 @@ func waitForDownload(downloadName string) error {
 			downloaded = true
 		}
 		if timeout {
-			return fmt.Errorf("download wait timed out")
+			return ErrTimeout
 		}
 	}
 	return err
@@ -171,12 +230,11 @@ func waitForDownload(downloadName string) error {
 
 func checkConfig() error {
 	if viper.GetBool("log.toFile") {
-		fo, err := os.Create("sgacrawl.log")
+		fo, err := os.Create("spectracrawl.log")
 		if err != nil {
 			return err
 		}
 		logFile = fo
-		defer logFile.Close()
 	}
 	log("[inf] start program")
 	// OVERRIDES
@@ -184,13 +242,13 @@ func checkConfig() error {
 		viper.Set("HITRAN.gasID", gasFlag)
 	}
 	if nuSFlag >= 0 {
-		viper.Set("HITRAN.startNu",nuSFlag)
+		viper.Set("HITRAN.startNu", nuSFlag)
 	}
 	if nuEFlag >= 0 {
-		viper.Set("HITRAN.endNu",nuEFlag)
+		viper.Set("HITRAN.endNu", nuEFlag)
 	}
 	if ppmFlag >= 0 {
-		viper.Set("HITRAN.ppm",ppmFlag)
+		viper.Set("HITRAN.ppm", ppmFlag)
 	}
 	// Config file information sanitizing
 	// timeouts and delays
@@ -204,7 +262,7 @@ func checkConfig() error {
 		log("[inf] spectraplot.calcTimeout_s set to 99 seconds")
 		viper.Set("spectraplot.calcTimeout_s", 99)
 	}
-	calcDelay:=viper.GetInt("spectraplot.calcDelay_s")
+	calcDelay := viper.GetInt("spectraplot.calcDelay_s")
 	if calcDelay < 0 {
 		log("[inf] calc delay (spectraplot.calcDelay_s) set to 1 second")
 		viper.Set("spectraplot.calcDelay_s", 1)
@@ -253,7 +311,7 @@ func checkConfig() error {
 		return fmt.Errorf("driver does not exist in path given. %s", err)
 	}
 	gasID := viper.GetString("HITRAN.gasID")
-	if gasID == ""  {
+	if gasID == "" {
 		return fmt.Errorf("null HITRAN.gasID")
 	}
 	outputPath := viper.GetString("output.dir")
@@ -276,7 +334,7 @@ func checkConfig() error {
 func setHitran(s *wd.Session, conditions spectraConditions) error {
 	Telem, err := query(s, `#hitran > div > div > table > tbody > tr:nth-child(1) > td:nth-child(2) > input[type=text]`)
 	if err != nil {
-		return err
+		return ErrPageScan
 	}
 	Pelem, err := query(s, `#hitran > div > div > table > tbody > tr:nth-child(2) > td:nth-child(2) > input[type=text]`)
 	if err != nil {
@@ -363,6 +421,7 @@ func waitForCalculation(s *wd.Session) error {
 		timeout = true
 	}()
 	submitButton, _ := s.FindElement("css selector", `#calculate_hitran`)
+	alertDangerButtons, _ := s.FindElements("css selector", `body > div[class='alert alert-danger alert-dismissible']`)
 	for !loaded {
 		text, _ := submitButton.Text()
 		if text != "Calculating..." {
@@ -371,7 +430,13 @@ func waitForCalculation(s *wd.Session) error {
 			time.Sleep(time.Millisecond * 100)
 		}
 		if timeout {
-			return fmt.Errorf("timeout")
+			return ErrTimeout
+		}
+		for _, e := range alertDangerButtons {
+			stl, _ := e.GetAttribute("style")
+			if stl == "display: block;" {
+				return ErrDanger
+			}
 		}
 	}
 	return nil
@@ -410,14 +475,14 @@ func Execute() {
 
 var gasFlag string
 var ppmFlag, nuSFlag, nuEFlag float64
+
 func init() {
 	cobra.OnInitialize(initConfig)
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", ".spectracrawl.yml", "config file (default is $HOME/.spectracrawl.yaml)")
 	rootCmd.PersistentFlags().StringVar(&gasFlag, "gas", "", "HITRAN.gasID override")
-	rootCmd.PersistentFlags().Float64Var(&ppmFlag, "ppm",-1,"HITRAN.ppm override")
-	rootCmd.PersistentFlags().Float64Var(&nuSFlag, "nu1",-1,"HITRAN.startNu override")
-	rootCmd.PersistentFlags().Float64Var(&nuEFlag, "nu2",-1,"HITRAN.endNu override")
-
+	rootCmd.PersistentFlags().Float64Var(&ppmFlag, "ppm", -1, "HITRAN.ppm override")
+	rootCmd.PersistentFlags().Float64Var(&nuSFlag, "nu1", -1, "HITRAN.startNu override")
+	rootCmd.PersistentFlags().Float64Var(&nuEFlag, "nu2", -1, "HITRAN.endNu override")
 }
 
 // initConfig reads in config file and ENV variables if set.

@@ -7,32 +7,30 @@ browser:
 output:
   dir: auto # path to directory for output .csv files
   timeout_s: 2 # integer [s]
-  replaceExisting: false # if false does not recalculate existing files.
+  replaceExisting: false
 
 # Prioritizes wavenumber input over wavelength. Leave wavenumber null to work with wavelength
 HITRAN:
-  gasID: "CH4"   # match must be exact. there's a list of possible gas IDs at the end of this file
+  gasID: "N2O"   # match must be exact. there's a list of possible gas IDs at the end of this file
   format: "%.3f" # applies to T, p, L
   ppm: 1.0         # [ppm]
   T: 253.0         # [K]
   p: 0.35          # [atm]
   L: 6000e3        # [cm]
-  startNu: 1000    # [cm-1]
-  endNu: 12000     # [cm-1]
+  startNu: 7000    # [cm-1]
+  endNu: 7700      # [cm-1]
   stepNu: 0.01     # [cm-1] min = 0.01
-  startLambda: 1   # [μm]  Lambdas ignored if Nus not null
-  endLambda: 3.5   # [μm]
 
 # calculation timeout is time waiting for spectraplot to finish HITRAN calculation
 spectraplot:
-  maxNumberOfPlots: 3  # As of 11/06/2020 one cannot graph > 3 plots
+  maxNumberOfPlots: 3
   maxRange: 100    # [cm-1]
-  calcTimeout_s: 2 # integer [s]
-  calcDelay_s: 0   # integer [s]
+  calcTimeout_s: 60 # integer [s]
+  calcDelay_s: 1   # integer [s]
 
 log:
   silent: false
-  toFile: false
+  toFile: true
 
 # available gas IDs
 # "CH3Cl" "CH3CN" "CH3OH" "CH4" "CO" "CO2" "COF2" "C2H2" "C2H4" "C2H6" "ClO" "HCOOH" "HCN" "HBr" "HCl" "HF" "HI" "HNO3" "HOBr" "HOCl" "H2O" "H2O2" "H2CO" "H2S" "NH3" "NO" "NO2" "NO+" "N2" "N2O" "O" "O2" "O3" "OCS" "OH" "PH3" "SO2"
