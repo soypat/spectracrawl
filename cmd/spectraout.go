@@ -153,6 +153,9 @@ func prettyF(f float64) string {
 	format := `%{front}.{back}`
 	isNegative := f < 0
 	f = math.Abs(f)
+	if f == 0 {
+		return "0"
+	}
 	if f+0.001 > 1e3 {
 		f = 0.001 + f
 	} else if f+1e-7 > 1e-3 {

@@ -17,7 +17,8 @@ const (
 
 func TestPrettyFormat(t *testing.T) {
 	tests := map[float64]string{
-		2:        "2",
+		0:          "0",
+		2:          "2",
 		999:        "999",
 		999.999:    "999.999",
 		999.9999:   "1e+03",
@@ -37,10 +38,9 @@ func TestPrettyFormat(t *testing.T) {
 		if output != expected {
 			t.Errorf("expected :%s\tgot: %s", expected, output)
 		}
-		if negOutput != "-"+expected {
+		if negOutput != "-"+expected && -input < 0 {
 			t.Errorf("expected :%s\tgot: %s", "-"+expected, output)
 		}
-
 	}
 }
 
