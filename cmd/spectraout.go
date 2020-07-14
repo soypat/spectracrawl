@@ -165,11 +165,15 @@ func prettyF(f float64) string {
 		f = math.Floor(f)
 	}
 	dec := f - math.Floor(f)
-	if (dec > 0 && dec >= 1e-3) || math.Log10(f) < -3 {
+	if dec > 0 && dec >= 1e-3  {
 		format = strings.Replace(format, "{back}", "3", 1)
 	}
 	if f <= 1e-3 || f >= 1e3 {
 		format = format + "e"
+		form:=fmt.Sprintf("%.3e",f)
+		if strings.Count(form,"0") < 3 {
+			format = strings.Replace(format, "{back}", "3", 1)
+		}
 	} else {
 		format = format + "f"
 	}
