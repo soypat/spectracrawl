@@ -33,6 +33,7 @@ var (
 	ErrTimeout        = fmt.Errorf("spectracrawl: timeout")
 	ErrDanger         = fmt.Errorf("spectracrawl: danger message popup encountered")
 	ErrDownloadedFile = fmt.Errorf("spectracrawl: downloaded file missing or corrupt")
+	ErrNoData         = fmt.Errorf("spectracrawl: no data to download available")
 )
 
 var logFile *os.File
@@ -80,10 +81,9 @@ http://github.com/soypat/spectracrawl
 const fpsep = string(filepath.Separator)
 
 const (
-	maxWaveNumber        = 47365.0
-	maxTemp              = 4e12
-	minNuStep            = 0.01
-	downloadTimeoutAfter = time.Second * 2
+	maxWaveNumber = 47365.0
+	maxTemp       = 4e12
+	minNuStep     = 0.01
 )
 const urlStart = "http://www.spectraplot.com/absorption"
 
@@ -144,6 +144,9 @@ func runner(_ []string) error {
 				return err
 			}
 			continue
+		} else if err == ErrNoData{
+			logf("[err] no data to download in interval [%.f-%.f]",processInterval[0][0],processInterval[len(processInterval)-1][1])
+			continue
 		} else if err != nil {
 			return err
 		}
@@ -155,6 +158,8 @@ func runner(_ []string) error {
 
 func makeFile(s *wd.Session, intervals [][2]float64) error {
 	downloadedFileName := viper.GetString("browser.downloadDir") + fpsep + defaultZipName
+	plotCount := 0
+	_ = leftClickSelector(s, `#clear`)
 	for _, interval := range intervals {
 		err := setHitran(s, spectraConditions{
 			T:       viper.GetFloat64("HITRAN.T"),
@@ -171,28 +176,30 @@ func makeFile(s *wd.Session, intervals [][2]float64) error {
 		} else if err != nil {
 			return err
 		}
+		time.Sleep(time.Duration(viper.GetInt("spectraplot.calcDelay_s")) * time.Second)
+		logf("[scp] calculating nu=[%.f-%.f] for %s", interval[0], interval[1], viper.GetString("HITRAN.gasID"))
+		_ = leftClickSelector(s, `#calculate_hitran`)
 		err = waitForCalculation(s)
 		if err == ErrTimeout {
 			log("[warn] calc timeout! dropping data and resuming work")
 			_ = leftClickSelector(s, `#clear`)
+			plotCount = 0
 			continue
 		} else if err == ErrDanger {
 			log("[warn] calc error! dropping data and try to resume")
 			_ = leftClickSelector(s, `#clear`)
+			plotCount = 0
 			continue
 		} else if err != nil {
 			return err
 		}
-		time.Sleep(time.Duration(viper.GetInt("spectraplot.calcDelay_s")) * time.Second)
-		logf("[scp] calculating nu=[%.f-%.f] for %s", interval[0], interval[1], viper.GetString("HITRAN.gasID"))
-		_ = leftClickSelector(s, `#calculate_hitran`)
+		plotCount++
 	}
-	err := waitForCalculation(s)
-	if err == ErrTimeout {
-		log("[warn] calc timeout! downloading data")
+	if plotCount == 0 {
+		return ErrNoData
 	}
 	_ = leftClickSelector(s, `#data`)
-	err = waitForDownload(downloadedFileName)
+	err := waitForDownload(downloadedFileName)
 	_ = leftClickSelector(s, `#clear`)
 	err = processSpectra(downloadedFileName, viper.GetString("output.dir"))
 	if err != nil {
